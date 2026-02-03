@@ -790,7 +790,14 @@ export const RELATIONS: Relation[] = [
     // ########## Lists of speakers
     ...makeGenericO2O<ViewListOfSpeakers, HasListOfSpeakers>({
         viewModel: ViewListOfSpeakers,
-        possibleViewModels: [ViewMotion, ViewMotionBlock, ViewAssignment, ViewTopic, ViewMediafile],
+        possibleViewModels: [
+            ViewMotion,
+            ViewMotionBlock,
+            ViewAssignment,
+            ViewAssignmentCandidate,
+            ViewTopic,
+            ViewMediafile
+        ],
         viewModelField: `content_object`,
         possibleViewModelsField: `list_of_speakers`
     }),
@@ -1077,7 +1084,7 @@ export const RELATIONS: Relation[] = [
     }),
     ...makeGenericM2M<ViewMeetingMediafile, HasAttachmentMeetingMediafiles>({
         viewModel: ViewMeetingMediafile,
-        possibleViewModels: [ViewTopic, ViewMotion, ViewAssignment],
+        possibleViewModels: [ViewTopic, ViewMotion, ViewAssignment, ViewAssignmentCandidate],
         viewModelField: `attachment_ids`,
         possibleViewModelsField: `attachment_meeting_mediafiles`
     }),

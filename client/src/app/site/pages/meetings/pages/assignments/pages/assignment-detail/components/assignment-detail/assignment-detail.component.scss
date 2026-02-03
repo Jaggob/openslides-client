@@ -61,16 +61,33 @@ mat-card mat-card-content h3 {
     }
 
     .single-candidate-line {
-        display: grid;
-        grid-template-columns: auto min-content;
-        grid-column-gap: 0.5em;
+        display: flex;
+        align-items: center;
+        gap: 0.5em;
 
-        span {
+        span,
+        .candidate-link {
             margin: auto 0;
         }
     }
     .deleted-candidate {
         color: slategrey;
+    }
+    .candidate-link {
+        flex: 1 1 auto;
+        min-width: 0;
+        text-decoration: none;
+    }
+    .candidate-main {
+        display: flex;
+        align-items: center;
+        gap: 0.5em;
+        min-width: 0;
+    }
+    .candidate-actions {
+        display: flex;
+        align-items: center;
+        margin-left: auto;
     }
 }
 

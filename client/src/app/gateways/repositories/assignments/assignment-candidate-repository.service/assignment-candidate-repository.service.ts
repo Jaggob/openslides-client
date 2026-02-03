@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Id } from 'src/app/domain/definitions/key-types';
 import { Identifiable } from 'src/app/domain/interfaces';
 import { Action } from 'src/app/gateways/actions';
-import { BaseMeetingRelatedRepository } from 'src/app/gateways/repositories/base-meeting-related-repository';
+import { BaseListOfSpeakersContentObjectRepository } from 'src/app/gateways/repositories/base-list-of-speakers-content-object-repository';
 import { ViewAssignmentCandidate } from 'src/app/site/pages/meetings/pages/assignments';
 import { UnknownUserLabel } from 'src/app/site/pages/meetings/pages/assignments/modules/assignment-poll/services/assignment-poll.service';
 
@@ -13,7 +13,7 @@ import { AssignmentCandidateAction } from './assignment-candidate.action';
 @Injectable({
     providedIn: `root`
 })
-export class AssignmentCandidateRepositoryService extends BaseMeetingRelatedRepository<
+export class AssignmentCandidateRepositoryService extends BaseListOfSpeakersContentObjectRepository<
     ViewAssignmentCandidate,
     AssignmentCandidate
 > {
@@ -37,6 +37,13 @@ export class AssignmentCandidateRepositoryService extends BaseMeetingRelatedRepo
     public delete(candidate: Identifiable): Action<void> {
         const payload: Identifiable = { id: candidate.id };
         return this.createAction(AssignmentCandidateAction.DELETE, [payload]);
+    }
+
+    public update(
+        candidate: Identifiable,
+        payload: Partial<AssignmentCandidate> & { attachment_mediafile_ids?: Id[] }
+    ): Action<Identifiable> {
+        return this.createAction(AssignmentCandidateAction.UPDATE, [{ id: candidate.id, ...payload }]);
     }
 
     /**

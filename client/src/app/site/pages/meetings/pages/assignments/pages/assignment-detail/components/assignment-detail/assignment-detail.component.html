@@ -188,9 +188,29 @@
                                                 'deleted-candidate': !item.user
                                             }"
                                         >
-                                            <span>{{ item.getTitle() }}</span>
+                                            <div class="candidate-main">
+                                                <os-projector-button
+                                                    *osPerms="permission.projectorCanManage"
+                                                    [object]="item"
+                                                    [blendIn]="true"
+                                                    matTooltip="{{ 'Project application' | translate }}"
+                                                />
+                                                <a
+                                                    class="candidate-link"
+                                                    [routerLink]="[
+                                                        '/',
+                                                        activeMeetingId,
+                                                        'assignments',
+                                                        assignment.sequential_number,
+                                                        'candidate',
+                                                        item.id
+                                                    ]"
+                                                >
+                                                    {{ getCandidateName(item) }}
+                                                </a>
+                                            </div>
                                             @if (hasPerms('manage')) {
-                                                <span>
+                                                <span class="candidate-actions">
                                                     <button
                                                         mat-icon-button
                                                         matTooltip="{{ 'Remove candidate' | translate }}"

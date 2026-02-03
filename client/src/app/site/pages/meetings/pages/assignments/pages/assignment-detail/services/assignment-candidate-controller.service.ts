@@ -31,6 +31,13 @@ export class AssignmentCandidateControllerService extends BaseMeetingControllerS
         return Action.from(...actions).resolve() as Promise<void>;
     }
 
+    public update(
+        candidate: Identifiable,
+        payload: Partial<AssignmentCandidate> & { attachment_mediafile_ids?: Id[] }
+    ): Promise<void> {
+        return this.repo.update(candidate, payload).resolve() as Promise<void>;
+    }
+
     public sort(assignment: Identifiable, candidates: Identifiable[]): Promise<void> {
         return this.repo.sort(assignment, candidates);
     }

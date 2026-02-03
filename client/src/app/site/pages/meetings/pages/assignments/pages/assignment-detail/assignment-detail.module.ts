@@ -1,9 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { NgModule } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatListModule } from '@angular/material/list';
@@ -12,6 +14,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ChipSelectModule } from 'src/app/site/modules/chip-select/chip-select.module';
 import { OpenSlidesTranslationModule } from 'src/app/site/modules/translations';
 import { AttachmentControlModule } from 'src/app/site/pages/meetings/modules/meetings-component-collector/attachment-control';
+import { IconContainerComponent } from 'src/app/ui/modules/icon-container';
 import { DirectivesModule } from 'src/app/ui/directives';
 import { EditorModule } from 'src/app/ui/modules/editor';
 import { HeadBarModule } from 'src/app/ui/modules/head-bar';
@@ -28,11 +31,12 @@ import { AssignmentPollModule } from '../../modules/assignment-poll/assignment-p
 import { AssignmentCommonServiceModule } from '../../services/assignment-common-service.module';
 import { AssignmentExportServiceModule } from '../../services/assignment-export-service.module';
 import { AssignmentDetailRoutingModule } from './assignment-detail-routing.module';
+import { AssignmentCandidateDetailComponent } from './components/assignment-candidate-detail/assignment-candidate-detail.component';
 import { AssignmentDetailComponent } from './components/assignment-detail/assignment-detail.component';
 import { AssignmentDetailServiceModule } from './services/assignment-detail-service.module';
 
 @NgModule({
-    declarations: [AssignmentDetailComponent],
+    declarations: [AssignmentDetailComponent, AssignmentCandidateDetailComponent],
     imports: [
         CommonModule,
         AssignmentDetailRoutingModule,
@@ -42,12 +46,14 @@ import { AssignmentDetailServiceModule } from './services/assignment-detail-serv
         AssignmentPollModule,
         ParticipantCommonServiceModule,
         ReactiveFormsModule,
+        MatButtonModule,
         MatCardModule,
         MatTooltipModule,
         MatIconModule,
         MatListModule,
         MatChipsModule,
         MatMenuModule,
+        MatDividerModule,
         MatInputModule,
         MatCheckboxModule,
         MeetingsComponentCollectorModule,
@@ -62,7 +68,8 @@ import { AssignmentDetailServiceModule } from './services/assignment-detail-serv
         ParticipantSearchSelectorModule,
         AgendaItemCommonServiceModule,
         ChipSelectModule,
-        ChessDialogModule
+        ChessDialogModule,
+        IconContainerComponent
     ]
 })
 export class AssignmentDetailModule {}

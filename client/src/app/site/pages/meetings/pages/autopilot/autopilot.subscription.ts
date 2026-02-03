@@ -66,7 +66,15 @@ export const getAutopilotContentSubscriptionConfig = (id: Id): SubscriptionConfi
         follow: [
             {
                 idField: `content_object_id`,
-                fieldset: [`title`, `owner_id`, `closed`, `moderator_notes`, ...MEETING_ROUTING_FIELDS],
+                fieldset: [
+                    `title`,
+                    `owner_id`,
+                    `closed`,
+                    `moderator_notes`,
+                    `meeting_user_id`,
+                    `assignment_id`,
+                    ...MEETING_ROUTING_FIELDS
+                ],
                 follow: [
                     {
                         idField: `mediafile_id`,
@@ -75,6 +83,14 @@ export const getAutopilotContentSubscriptionConfig = (id: Id): SubscriptionConfi
                     {
                         idField: `poll_ids`,
                         ...pollModelRequest
+                    },
+                    {
+                        idField: `meeting_user_id`,
+                        ...MeetingUserFieldsets.FullNameSubscription
+                    },
+                    {
+                        idField: `assignment_id`,
+                        fieldset: [`title`, ...MEETING_ROUTING_FIELDS]
                     },
                     speakersFields,
                     {
