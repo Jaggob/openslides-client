@@ -6123,3 +6123,12 @@ msgstr "отправлено"
 
 msgid "withdrawn"
 msgstr ""
+
+msgid "No text submitted"
+msgstr "Текст не отправлен"
+
+msgid "Enable candidate applications"
+msgstr "Включить тексты кандидатур"
+
+msgid "Candidate applications are disabled for this meeting."
+msgstr "Тексты кандидатур отключены для этого собрания."

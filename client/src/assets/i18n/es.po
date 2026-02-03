@@ -6590,3 +6590,12 @@ msgstr "presentado"
 
 msgid "withdrawn"
 msgstr "retirado"
+
+msgid "No text submitted"
+msgstr "No se ha enviado ningún texto"
+
+msgid "Enable candidate applications"
+msgstr "Habilitar textos de candidatura"
+
+msgid "Candidate applications are disabled for this meeting."
+msgstr "Los textos de candidatura están desactivados para esta reunión."

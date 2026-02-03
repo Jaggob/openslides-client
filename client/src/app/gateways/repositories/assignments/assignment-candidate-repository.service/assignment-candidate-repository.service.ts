@@ -2,8 +2,10 @@ import { Injectable } from '@angular/core';
 import { Id } from 'src/app/domain/definitions/key-types';
 import { Identifiable } from 'src/app/domain/interfaces';
 import { Action } from 'src/app/gateways/actions';
-import { BaseListOfSpeakersContentObjectRepository } from 'src/app/gateways/repositories/base-list-of-speakers-content-object-repository';
+import { AgendaItemRepositoryService } from 'src/app/gateways/repositories/agenda';
+import { BaseAgendaItemAndListOfSpeakersContentObjectRepository } from 'src/app/gateways/repositories/base-agenda-item-and-list-of-speakers-content-object-repository';
 import { ViewAssignmentCandidate } from 'src/app/site/pages/meetings/pages/assignments';
+import { AgendaListTitle } from 'src/app/site/pages/meetings/pages/agenda';
 import { UnknownUserLabel } from 'src/app/site/pages/meetings/pages/assignments/modules/assignment-poll/services/assignment-poll.service';
 
 import { AssignmentCandidate } from '../../../../domain/models/assignments/assignment-candidate';
@@ -13,18 +15,30 @@ import { AssignmentCandidateAction } from './assignment-candidate.action';
 @Injectable({
     providedIn: `root`
 })
-export class AssignmentCandidateRepositoryService extends BaseListOfSpeakersContentObjectRepository<
+export class AssignmentCandidateRepositoryService extends BaseAgendaItemAndListOfSpeakersContentObjectRepository<
     ViewAssignmentCandidate,
     AssignmentCandidate
 > {
-    public constructor(repositoryServiceCollector: RepositoryMeetingServiceCollectorService) {
-        super(repositoryServiceCollector, AssignmentCandidate);
+    public constructor(
+        repositoryServiceCollector: RepositoryMeetingServiceCollectorService,
+        agendaItemRepo: AgendaItemRepositoryService
+    ) {
+        super(repositoryServiceCollector, AssignmentCandidate, agendaItemRepo);
     }
 
     public getTitle = (viewAssignmentCandidate: ViewAssignmentCandidate): string =>
         viewAssignmentCandidate.user?.getTitle() ?? UnknownUserLabel;
 
     public getVerboseName = (plural = false): string => this.translate.instant(plural ? `Candidates` : `Candidate`);
+
+    public override getAgendaListTitle(viewAssignmentCandidate: ViewAssignmentCandidate): AgendaListTitle {
+        const candidateName = viewAssignmentCandidate.user?.short_name || UnknownUserLabel;
+        const assignmentName = viewAssignmentCandidate.assignment?.title || ``;
+        const title = assignmentName
+            ? `${assignmentName} · ${candidateName}`
+            : `${candidateName}`;
+        return { title };
+    }
 
     public async create(assignment: Identifiable, meetingUserId: Id): Promise<Identifiable> {
         const payload = {

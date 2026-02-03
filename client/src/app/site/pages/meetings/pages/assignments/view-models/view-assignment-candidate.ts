@@ -7,6 +7,7 @@ import { ViewUser } from 'src/app/site/pages/meetings/view-models/view-user';
 
 import { AssignmentCandidate } from '../../../../../../domain/models/assignments/assignment-candidate';
 import { HasListOfSpeakers } from '../../agenda/modules/list-of-speakers';
+import { HasAgendaItem, ViewAgendaItem } from '../../agenda';
 import { HasAttachmentMeetingMediafiles } from '../../mediafiles/view-models/has-attachment';
 import { HasMeeting } from '../../../view-models/has-meeting';
 import { ViewListOfSpeakers } from '../../agenda/modules/list-of-speakers/view-models/view-list-of-speakers';
@@ -46,6 +47,7 @@ export class ViewAssignmentCandidate extends BaseProjectableViewModel<Assignment
 interface IAssignmentCandidateRelations {
     assignment: ViewAssignment;
     list_of_speakers?: ViewListOfSpeakers;
+    agenda_item?: ViewAgendaItem;
 }
 export interface ViewAssignmentCandidate
     extends
@@ -53,4 +55,5 @@ export interface ViewAssignmentCandidate
         ViewModelRelations<IAssignmentCandidateRelations>,
         HasMeeting,
         HasAttachmentMeetingMediafiles,
-        HasListOfSpeakers {}
+        HasListOfSpeakers,
+        HasAgendaItem {}

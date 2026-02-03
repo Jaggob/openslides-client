@@ -79,6 +79,7 @@ export const meetingSettingsDefaults: Record<string, any> = {
     assignment_poll_ballot_paper_selection: `CUSTOM_NUMBER`,
     assignment_poll_ballot_paper_number: 8,
     assignments_export_title: _(`Elections`),
+    assignments_enable_candidate_applications: false,
     users_enable_presence_view: false,
     users_allow_self_set_present: true,
     users_enable_vote_weight: false,

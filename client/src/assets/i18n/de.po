@@ -6690,3 +6690,12 @@ msgstr "eingereicht"
 
 msgid "withdrawn"
 msgstr "zurückgezogen"
+
+msgid "No text submitted"
+msgstr "Kein Text eingereicht"
+
+msgid "Enable candidate applications"
+msgstr "Kandidaturtexte aktivieren"
+
+msgid "Candidate applications are disabled for this meeting."
+msgstr "Kandidaturtexte sind für diese Veranstaltung deaktiviert."

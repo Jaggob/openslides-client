@@ -12,6 +12,7 @@ export class AssignmentCandidate extends BaseModel<AssignmentCandidate> {
 
     public weight!: number;
     public application!: string;
+    public agenda_item_id?: Id;
     public list_of_speakers_id!: Id;
     public projection_ids!: Id[];
     public attachment_meeting_mediafile_ids!: Id[];
@@ -27,6 +28,7 @@ export class AssignmentCandidate extends BaseModel<AssignmentCandidate> {
         `id`,
         `weight`,
         `application`,
+        `agenda_item_id`,
         `assignment_id`,
         `meeting_user_id`,
         `meeting_id`,

@@ -32,7 +32,7 @@ export class AssignmentCandidatePdfService {
         this.pdfDocumentService.download({ docDefinition: doc, filename, metadata });
     }
 
-    private candidateToDocDef(candidate: ViewAssignmentCandidate, assignment?: ViewAssignment): Content[] {
+    public candidateToDocDef(candidate: ViewAssignmentCandidate, assignment?: ViewAssignment): Content[] {
         const title = this.createTitle(candidate);
         const assignmentInfo = assignment ? this.createAssignmentInfo(assignment) : [];
         const application = this.createApplication(candidate);
@@ -61,7 +61,7 @@ export class AssignmentCandidatePdfService {
             return this.htmlToPdfService.addPlainText(candidate.application);
         }
         return {
-            text: this.translate.instant(`No application submitted`),
+            text: this.translate.instant(`No text submitted`),
             style: `textItem`,
             italics: true,
             margin: [0, 0, 0, 10]

@@ -1,4 +1,12 @@
-<os-head-bar [goBack]="false" [nav]="false" [prevUrl]="assignmentBackUrl">
+<os-head-bar
+    [goBack]="!isEditing"
+    [nav]="false"
+    [prevUrl]="assignmentBackUrl"
+    [editMode]="isEditing"
+    [isSaveButtonEnabled]="!form.pristine"
+    [saveAction]="saveApplicationAction"
+    (cancelEditEvent)="navigateToView()"
+>
     <div class="title-slot">
         @if (candidate) {
             <h1 class="mock-h2">
@@ -44,7 +52,7 @@
 </os-head-bar>
 <mat-menu #candidateMenu="matMenu">
     <os-speaker-button [menuItem]="true" [object]="candidate" />
-    @if (canEdit && !isEditing) {
+    @if (canEdit && !isEditing && candidateApplicationsEnabled) {
         <button mat-menu-item [routerLink]="['edit']">
             <mat-icon>edit</mat-icon>
             <span>{{ 'Edit' | translate }}</span>
@@ -63,7 +71,7 @@
     />
     <os-projector-button *osPerms="permission.projectorCanManage" [menuItem]="true" [object]="candidate" />
     <div *osPerms="permission.agendaItemCanManage">
-        @if (!assignment?.agenda_item_id) {
+        @if (!candidate?.agenda_item_id) {
             <button mat-menu-item (click)="addToAgenda()">
                 <mat-icon>add</mat-icon>
                 <span>{{ 'Add to agenda' | translate }}</span>
@@ -90,53 +98,57 @@
     }
 </mat-menu>
 
-<div class="spacer-bottom-60">
-    <mat-card class="os-card">
-        <mat-card-content>
-            @if (candidate?.application) {
-                <div class="application" [innerHTML]="candidate.application | trust: 'html'"></div>
-            } @else {
-                <div class="application-empty">{{ 'No application submitted' | translate }}</div>
-            }
-
-            @if (sortedAttachments.length) {
-                <mat-list class="election-document-list" dense>
-                    @for (file of sortedAttachments; track file) {
-                        <mat-list-item class="attachment-entry">
-                            <a target="_blank" [routerLink]="file.url">
-                                <mat-icon class="attachment-icon">{{ file.getIcon() }}</mat-icon>
-                                {{ file.getTitle() }}
-                            </a>
-                        </mat-list-item>
+@if (!isEditing) {
+    <div class="spacer-bottom-60">
+        <mat-card class="os-card">
+            <mat-card-content>
+                @if (candidateApplicationsEnabled) {
+                    @if (candidate?.application) {
+                        <div class="application" [innerHTML]="candidate.application | trust: 'html'"></div>
+                    } @else {
+                        <div class="application-empty">{{ 'No text submitted' | translate }}</div>
                     }
-                </mat-list>
-            }
-        </mat-card-content>
-    </mat-card>
-</div>
 
-@if (canEdit && isEditing) {
-    <mat-card class="os-card spacer-bottom-60">
-        <mat-card-content>
-            <h3>{{ 'Edit application' | translate }}</h3>
-            <form class="content" tabindex="-1" [formGroup]="form">
-                <os-editor formControlName="application" [allowEmbeds]="true"></os-editor>
-                <os-attachment-control formControlName="attachment_mediafile_ids"></os-attachment-control>
-                <div class="form-button">
-                    <button
-                        color="accent"
-                        mat-flat-button
-                        type="button"
-                        (click)="saveApplication()"
-                        [disabled]="form.pristine"
-                    >
-                        {{ 'Save' | translate }}
-                    </button>
-                    <button mat-button type="button" [routerLink]="['../']">
-                        {{ 'Cancel' | translate }}
-                    </button>
-                </div>
-            </form>
-        </mat-card-content>
-    </mat-card>
+                    @if (sortedAttachments.length) {
+                        <div class="content-field">
+                            <div>
+                                <h3>
+                                    {{ 'Attachments' | translate }}
+                                    <mat-icon>attach_file</mat-icon>
+                                </h3>
+                                <mat-list class="election-document-list" dense>
+                                    @for (file of sortedAttachments; track file) {
+                                        <mat-list-item class="attachment-entry">
+                                            <a target="_blank" [routerLink]="file.url">
+                                                <mat-icon class="attachment-icon">{{ file.getIcon() }}</mat-icon>
+                                                {{ file.getTitle() }}
+                                            </a>
+                                        </mat-list-item>
+                                    }
+                                </mat-list>
+                            </div>
+                        </div>
+                    }
+                } @else {
+                    <div class="application-empty">
+                        {{ 'Candidate applications are disabled for this meeting.' | translate }}
+                    </div>
+                }
+            </mat-card-content>
+        </mat-card>
+    </div>
 }
+
+    @if (candidateApplicationsEnabled && canEdit && isEditing) {
+        <mat-card class="os-card spacer-bottom-60">
+            <mat-card-content>
+                <h3>{{ 'Edit application' | translate }}</h3>
+                <form class="content" tabindex="-1" [formGroup]="form">
+                    <os-editor formControlName="application" [allowEmbeds]="true"></os-editor>
+                    <div *osPerms="permission.mediafileCanManage">
+                        <os-attachment-control formControlName="attachment_mediafile_ids"></os-attachment-control>
+                    </div>
+                </form>
+            </mat-card-content>
+        </mat-card>
+    }

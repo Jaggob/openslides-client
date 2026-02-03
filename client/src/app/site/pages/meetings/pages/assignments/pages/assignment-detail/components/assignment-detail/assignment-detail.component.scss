@@ -64,6 +64,7 @@ mat-card mat-card-content h3 {
         display: flex;
         align-items: center;
         gap: 0.5em;
+        width: 100%;
 
         span,
         .candidate-link {
@@ -78,11 +79,17 @@ mat-card mat-card-content h3 {
         min-width: 0;
         text-decoration: none;
     }
+
+    .candidate-link-disabled {
+        cursor: default;
+        opacity: 0.7;
+    }
     .candidate-main {
         display: flex;
         align-items: center;
         gap: 0.5em;
         min-width: 0;
+        flex: 1 1 auto;
     }
     .candidate-actions {
         display: flex;

@@ -6470,3 +6470,12 @@ msgstr "inviato"
 
 msgid "withdrawn"
 msgstr "ritirato"
+
+msgid "No text submitted"
+msgstr "Nessun testo inviato"
+
+msgid "Enable candidate applications"
+msgstr "Abilitare i testi di candidatura"
+
+msgid "Candidate applications are disabled for this meeting."
+msgstr "I testi di candidatura sono disabilitati per questa riunione."

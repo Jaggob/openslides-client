@@ -41,6 +41,8 @@ export class AssignmentDetailComponent extends BaseMeetingComponent implements O
 
     public readonly hasLoaded = new Deferred<boolean>();
 
+    public candidateApplicationsEnabled = true;
+
     /**
      * Determines if the assignment is new
      */
@@ -178,6 +180,13 @@ export class AssignmentDetailComponent extends BaseMeetingComponent implements O
             agenda_type: [``],
             number_poll_candidates: [false]
         });
+
+        this.updateSubscription(
+            `candidate_applications_enabled`,
+            this.meetingSettingsService
+                .get(`assignments_enable_candidate_applications`)
+                .subscribe(value => (this.candidateApplicationsEnabled = !!value))
+        );
     }
 
     public onIdFound(id: Id | null): void {

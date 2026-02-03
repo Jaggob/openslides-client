@@ -176,6 +176,7 @@ export class Settings {
     // Assignments
     public assignments_export_title!: string;
     public assignments_export_preamble!: string;
+    public assignments_enable_candidate_applications!: boolean;
 
     public assignment_poll_ballot_paper_selection!: BallotPaperSelection;
     public assignment_poll_ballot_paper_number!: number;
@@ -440,6 +441,7 @@ export class Meeting extends BaseModel<Meeting> {
         `users_forbid_delegator_to_vote`,
         `assignments_export_title`,
         `assignments_export_preamble`,
+        `assignments_enable_candidate_applications`,
         `assignment_poll_ballot_paper_selection`,
         `assignment_poll_ballot_paper_number`,
         `assignment_poll_add_candidates_to_list_of_speakers`,

@@ -195,19 +195,25 @@
                                                     [blendIn]="true"
                                                     matTooltip="{{ 'Project application' | translate }}"
                                                 />
-                                                <a
-                                                    class="candidate-link"
-                                                    [routerLink]="[
-                                                        '/',
-                                                        activeMeetingId,
-                                                        'assignments',
-                                                        assignment.sequential_number,
-                                                        'candidate',
-                                                        item.id
-                                                    ]"
-                                                >
-                                                    {{ getCandidateName(item) }}
-                                                </a>
+                                                @if (candidateApplicationsEnabled) {
+                                                    <a
+                                                        class="candidate-link"
+                                                        [routerLink]="[
+                                                            '/',
+                                                            activeMeetingId,
+                                                            'assignments',
+                                                            assignment.sequential_number,
+                                                            'candidate',
+                                                            item.id
+                                                        ]"
+                                                    >
+                                                        {{ getCandidateName(item) }}
+                                                    </a>
+                                                } @else {
+                                                    <span class="candidate-link candidate-link-disabled">
+                                                        {{ getCandidateName(item) }}
+                                                    </span>
+                                                }
                                             </div>
                                             @if (hasPerms('manage')) {
                                                 <span class="candidate-actions">
