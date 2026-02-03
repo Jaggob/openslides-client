@@ -3,12 +3,10 @@ import { UntypedFormBuilder, UntypedFormGroup } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
 import { Subscription, combineLatest } from 'rxjs';
-import { filter, take } from 'rxjs/operators';
+import { filter } from 'rxjs/operators';
 import { Id } from 'src/app/domain/definitions/key-types';
 import { Permission } from 'src/app/domain/definitions/permission';
 import { Assignment } from 'src/app/domain/models/assignments/assignment';
-import { MeetingMediafileRepositoryService } from 'src/app/gateways/repositories/meeting-mediafile/meeting-mediafile-repository.service';
-import { MediafileRepositoryService } from 'src/app/gateways/repositories/mediafiles/mediafile-repository.service';
 import { BaseMeetingComponent } from 'src/app/site/pages/meetings/base/base-meeting.component';
 import { ViewAssignment, ViewAssignmentCandidate } from 'src/app/site/pages/meetings/pages/assignments';
 import { ViewMeetingMediafile } from 'src/app/site/pages/meetings/pages/mediafiles';
@@ -41,6 +39,7 @@ export class AssignmentCandidateDetailComponent extends BaseMeetingComponent imp
 
     private _assignmentId: Id | null = null;
     private _candidateId: Id | null = null;
+    private _candidateSubscription: Subscription | null = null;
     private _subs: Subscription[] = [];
 
     public constructor(
@@ -53,8 +52,6 @@ export class AssignmentCandidateDetailComponent extends BaseMeetingComponent imp
         private candidatePdfService: AssignmentCandidatePdfService,
         private promptService: PromptService,
         private operator: OperatorService,
-        private meetingMediafileRepo: MeetingMediafileRepositoryService,
-        private mediafileRepo: MediafileRepositoryService,
         formBuilder: UntypedFormBuilder
     ) {
         super();
@@ -99,6 +96,7 @@ export class AssignmentCandidateDetailComponent extends BaseMeetingComponent imp
 
     public override ngOnDestroy(): void {
         this._subs.forEach(sub => sub.unsubscribe());
+        this._candidateSubscription?.unsubscribe();
     }
 
     public get canEdit(): boolean {
@@ -152,10 +150,6 @@ export class AssignmentCandidateDetailComponent extends BaseMeetingComponent imp
             return;
         }
         await this.assignmentCandidateRepo.update(this.candidate, this.form.value);
-        // Optimistically update the view to avoid a manual refresh.
-        this.candidate.application = this.form.value.application || ``;
-        const mediafileIds = (this.form.value.attachment_mediafile_ids || []) as Id[];
-        this.updateAttachmentsFromMediafiles(mediafileIds);
         this.form.markAsPristine();
         this.navigateToView();
     }
@@ -230,15 +224,7 @@ export class AssignmentCandidateDetailComponent extends BaseMeetingComponent imp
         this.previousCandidate = index > 0 ? candidates[index - 1] : null;
         this.nextCandidate = index >= 0 && index < candidates.length - 1 ? candidates[index + 1] : null;
         if (this.candidate) {
-            this.form.patchValue({
-                application: this.candidate.application || ``,
-                attachment_mediafile_ids:
-                    this.candidate.attachment_meeting_mediafiles?.map(file => file.mediafile_id) || []
-            });
-            this.form.markAsPristine();
-            if (this.isEditing && !this.canEdit) {
-                this.navigateToView();
-            }
+            this.subscribeToCandidate(this.candidate.id);
         }
     }
 
@@ -252,65 +238,30 @@ export class AssignmentCandidateDetailComponent extends BaseMeetingComponent imp
         );
     }
 
-    private mapToMeetingMediafiles(
-        mediafileIds: Id[]
-    ): { meetingMediafiles: ViewMeetingMediafile[]; meetingMediafileIds: Id[] } {
-        if (!this.activeMeetingId || !mediafileIds?.length) {
-            return { meetingMediafiles: [], meetingMediafileIds: [] };
+    private subscribeToCandidate(candidateId: Id): void {
+        if (this._candidateId !== candidateId) {
+            this._candidateId = candidateId;
         }
-        const meetingMediafiles: ViewMeetingMediafile[] = [];
-        const meetingMediafileIds: Id[] = [];
-        for (const mediafileId of mediafileIds) {
-            const meetingMediafileId = this.meetingMediafileRepo.getIdByMediafile(this.activeMeetingId!, mediafileId);
-            if (meetingMediafileId) {
-                const meetingMediafile = this.meetingMediafileRepo.getViewModel(meetingMediafileId);
-                if (meetingMediafile) {
-                    meetingMediafiles.push(meetingMediafile);
-                    meetingMediafileIds.push(meetingMediafile.id);
-                    continue;
+        if (this._candidateSubscription) {
+            this._candidateSubscription.unsubscribe();
+        }
+        this._candidateSubscription = this.assignmentCandidateRepo
+            .getViewModelObservable(candidateId)
+            .pipe(filter(candidate => !!candidate))
+            .subscribe(candidate => {
+                this.candidate = candidate;
+                if (!this.isEditing) {
+                    this.form.patchValue({
+                        application: candidate?.application || ``,
+                        attachment_mediafile_ids:
+                            candidate?.attachment_meeting_mediafiles?.map(file => file.mediafile_id) || []
+                    });
+                    this.form.markAsPristine();
                 }
-            }
-            const mediafile = this.mediafileRepo.getViewModel(mediafileId);
-            if (mediafile) {
-                meetingMediafiles.push(this.createFallbackMeetingMediafile(mediafileId));
-            }
-        }
-        return { meetingMediafiles, meetingMediafileIds };
-    }
-
-    private createFallbackMeetingMediafile(mediafileId: Id): ViewMeetingMediafile {
-        const mediafile = this.mediafileRepo.getViewModel(mediafileId);
-        const url = mediafile?.is_directory ? `/mediafiles/${mediafileId}` : `/system/media/get/${mediafileId}`;
-        return {
-            id: -mediafileId,
-            meeting_id: this.activeMeetingId!,
-            mediafile_id: mediafileId,
-            mediafile,
-            getTitle: () => mediafile?.title || ``,
-            getIcon: () => mediafile?.getIcon() || `insert_drive_file`,
-            url
-        } as ViewMeetingMediafile;
-    }
-
-    private updateAttachmentsFromMediafiles(mediafileIds: Id[]): void {
-        if (!this.candidate) {
-            return;
-        }
-        const { meetingMediafiles, meetingMediafileIds } = this.mapToMeetingMediafiles(mediafileIds);
-        this.candidate.attachment_meeting_mediafiles = meetingMediafiles;
-        this.candidate.attachment_meeting_mediafile_ids = meetingMediafileIds;
-        const missingMediafileIds = mediafileIds.filter(id => !this.mediafileRepo.getViewModel(id));
-        for (const missingId of missingMediafileIds) {
-            this._subs.push(
-                this.mediafileRepo
-                    .getViewModelObservable(missingId)
-                    .pipe(
-                        filter(mediafile => !!mediafile),
-                        take(1)
-                    )
-                    .subscribe(() => this.updateAttachmentsFromMediafiles(mediafileIds))
-            );
-        }
+                if (this.isEditing && !this.canEdit) {
+                    this.navigateToView();
+                }
+            });
     }
 
 }
