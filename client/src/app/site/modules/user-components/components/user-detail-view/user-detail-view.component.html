@@ -57,11 +57,8 @@
 
 <ng-template #editTemplate>
     <form [formGroup]="personalInfoForm">
-        <div class="profile-layout" [class.side]="profileImageLayout === 'side'">
+        <div class="profile-layout" [class.side]="effectiveProfileImageLayout === 'side'">
             <div class="profile-main">
-                @if (profileImageLayout !== 'side') {
-                    <ng-container [ngTemplateOutlet]="profileImageSection"></ng-container>
-                }
                 <h2>{{ 'Personal information' | translate }}</h2>
                 <!-- First line -->
                 @if (!isAccountSelfUpdate) {
@@ -211,8 +208,11 @@
                         <mat-checkbox formControlName="is_physical_person">{{ 'natural person' | translate }}</mat-checkbox>
                     </div>
                 }
+                @if (effectiveProfileImageLayout !== 'side') {
+                    <ng-container [ngTemplateOutlet]="profileImageSection"></ng-container>
+                }
             </div>
-            @if (profileImageLayout === 'side') {
+            @if (effectiveProfileImageLayout === 'side') {
                 <div class="profile-side">
                     <ng-container [ngTemplateOutlet]="profileImageSection"></ng-container>
                 </div>
@@ -222,9 +222,9 @@
 </ng-template>
 
 <ng-template #showTemplate>
-    <div class="profile-layout" [class.side]="profileImageLayout === 'side'">
+    <div class="profile-layout" [class.side]="effectiveProfileImageLayout === 'side'">
         <div class="profile-main">
-            @if (profileImageLayout !== 'side') {
+            @if (effectiveProfileImageLayout !== 'side') {
                 <ng-container [ngTemplateOutlet]="profileImageSection"></ng-container>
             }
             <h2 [class.header-margin]="!useBottomMargin">{{ 'Personal information' | translate }}</h2>
@@ -301,7 +301,7 @@
                 }
             }
         </div>
-        @if (profileImageLayout === 'side') {
+        @if (effectiveProfileImageLayout === 'side') {
             <div class="profile-side">
                 <ng-container [ngTemplateOutlet]="profileImageSection"></ng-container>
             </div>

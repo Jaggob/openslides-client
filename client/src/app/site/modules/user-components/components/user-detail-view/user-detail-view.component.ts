@@ -94,6 +94,10 @@ export class UserDetailViewComponent extends BaseUiComponent implements OnInit, 
     @Input()
     public profileImageLayout: `top` | `side` = `top`;
 
+    public get effectiveProfileImageLayout(): `top` | `side` {
+        return this.isEditing ? `top` : this.profileImageLayout;
+    }
+
     @Input()
     public set additionalFormControls(controls: any) {
         this._additionalFormControls = controls;
