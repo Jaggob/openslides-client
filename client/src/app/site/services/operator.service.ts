@@ -859,6 +859,18 @@ export class OperatorService {
                         fieldset: [`all_child_ids`]
                     },
                     {
+                        idField: `profile_image_id`,
+                        fieldset: [
+                            `id`,
+                            `filename`,
+                            `mimetype`,
+                            `is_directory`,
+                            `owner_id`,
+                            `published_to_meetings_in_organization_id`,
+                            `meeting_mediafile_ids`
+                        ]
+                    },
+                    {
                         idField: `gender_id`,
                         fieldset: [`name`]
                     }

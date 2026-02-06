@@ -295,6 +295,14 @@ export const RELATIONS: Relation[] = [
         MField: `home_committee`,
         OField: `users`
     }),
+    {
+        ownViewModels: [ViewUser],
+        foreignViewModel: ViewMediafile,
+        ownField: `profile_image`,
+        ownIdField: `profile_image_id`,
+        many: false,
+        generic: false
+    },
     // Vote delegations
     // vote_delegated_to_id -> vote_delegations_from_ids
     {
