@@ -292,6 +292,7 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
 
         try {
             await this.updateUser();
+            await this.userDetailView?.commitProfileImageChanges(this.user);
         } catch (e) {
             this.raiseError(e);
         }

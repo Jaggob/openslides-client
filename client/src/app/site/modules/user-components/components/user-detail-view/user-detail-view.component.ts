@@ -55,11 +55,7 @@ export class UserDetailViewComponent extends BaseUiComponent implements OnInit, 
     public set user(user: ViewUser | null) {
         const oldUser = this._user;
         this._user = user;
-        if (this.profileImagePreviewUrl) {
-            URL.revokeObjectURL(this.profileImagePreviewUrl);
-            this.profileImagePreviewUrl = null;
-        }
-        this.profileImageUploadError = null;
+        this.resetProfileImageChanges();
         if (!oldUser) {
             this.prepareForm();
         } else if (this.selfUpdateEnabled) {
@@ -151,7 +147,13 @@ export class UserDetailViewComponent extends BaseUiComponent implements OnInit, 
     }
 
     public get profileImageUrl(): string | null {
-        return this.profileImagePreviewUrl ?? this.user?.profile_image?.url ?? null;
+        if (this.profileImagePreviewUrl) {
+            return this.profileImagePreviewUrl;
+        }
+        if (this.pendingProfileImageDelete) {
+            return null;
+        }
+        return this.user?.profile_image?.url ?? null;
     }
 
     public genderListSubscriptionConfig = getGenderListSubscriptionConfig();
@@ -192,6 +194,8 @@ export class UserDetailViewComponent extends BaseUiComponent implements OnInit, 
     public profileImageUploadError: string | null = null;
     public profileImageUploading = false;
     private profileImagePreviewUrl: string | null = null;
+    private pendingProfileImageFile: File | null = null;
+    private pendingProfileImageDelete = false;
 
     public constructor(
         private fb: UntypedFormBuilder,
@@ -226,7 +230,7 @@ export class UserDetailViewComponent extends BaseUiComponent implements OnInit, 
     }
 
     public async onProfileImageSelected(event: Event): Promise<void> {
-        if (!this.user || !this.canEditProfileImage) {
+        if (!this.canEditProfileImage || (!this.user && !this.isNewUser)) {
             return;
         }
         const input = event.target as HTMLInputElement;
@@ -235,18 +239,51 @@ export class UserDetailViewComponent extends BaseUiComponent implements OnInit, 
         }
         const file = input.files[0];
         this.profileImageUploadError = null;
-        this.profileImageUploading = true;
         if (this.profileImagePreviewUrl) {
             URL.revokeObjectURL(this.profileImagePreviewUrl);
         }
         this.profileImagePreviewUrl = URL.createObjectURL(file);
+        this.pendingProfileImageFile = file;
+        this.pendingProfileImageDelete = false;
+        this._hasChanges = true;
+        this.propagateValues();
+        input.value = ``;
+    }
+
+    public async onProfileImageDelete(): Promise<void> {
+        if (!this.canEditProfileImage || (!this.user && !this.pendingProfileImageFile && !this.profileImageUrl)) {
+            return;
+        }
+        this.profileImageUploadError = null;
+        if (this.profileImagePreviewUrl) {
+            URL.revokeObjectURL(this.profileImagePreviewUrl);
+            this.profileImagePreviewUrl = null;
+        }
+        this.pendingProfileImageFile = null;
+        this.pendingProfileImageDelete = true;
+        this._hasChanges = true;
+        this.propagateValues();
+    }
+
+    public async commitProfileImageChanges(identifiable?: { id: number } | null): Promise<void> {
+        const target = identifiable ?? this.user;
+        if (!target || !this.hasPendingProfileImageChange()) {
+            return;
+        }
+        this.profileImageUploadError = null;
+        this.profileImageUploading = true;
         try {
-            await this.userRepo.setProfileImage(this.user, file);
+            if (this.pendingProfileImageDelete) {
+                await this.userRepo.deleteProfileImage(target);
+            } else if (this.pendingProfileImageFile) {
+                await this.userRepo.setProfileImage(target, this.pendingProfileImageFile);
+            }
+            this.resetProfileImageChanges();
         } catch (error) {
-            this.profileImageUploadError = this.translate.instant(`Profile image upload failed`);
+            this.profileImageUploadError = this.translate.instant(`Profile image update failed`);
         } finally {
             this.profileImageUploading = false;
-            input.value = ``;
+            this.propagateValues();
         }
     }
 
@@ -404,9 +441,25 @@ export class UserDetailViewComponent extends BaseUiComponent implements OnInit, 
             // setTimeout prevents 'ExpressionChangedAfterItHasBeenChecked'-error
             const changes = this.getChangedValues(this.personalInfoForm.value);
             this.changeEvent.emit(changes);
-            this.validEvent.emit(this.personalInfoForm.valid && (this.isNewUser || this._hasChanges));
+            this.validEvent.emit(
+                this.personalInfoForm.valid && (this.isNewUser || this._hasChanges || this.hasPendingProfileImageChange())
+            );
             this.errorEvent.emit(this.personalInfoForm.errors);
         });
+    }
+
+    private hasPendingProfileImageChange(): boolean {
+        return !!this.pendingProfileImageFile || this.pendingProfileImageDelete;
+    }
+
+    private resetProfileImageChanges(): void {
+        if (this.profileImagePreviewUrl) {
+            URL.revokeObjectURL(this.profileImagePreviewUrl);
+            this.profileImagePreviewUrl = null;
+        }
+        this.pendingProfileImageFile = null;
+        this.pendingProfileImageDelete = false;
+        this.profileImageUploadError = null;
     }
 
     private noSpaceValidator(): ValidationErrors | null {

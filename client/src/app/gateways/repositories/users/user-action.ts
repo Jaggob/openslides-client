@@ -8,6 +8,7 @@ export class UserAction {
     public static readonly SET_PASSWORD = `user.set_password`;
     public static readonly SET_PASSWORD_SELF = `user.set_password_self`;
     public static readonly SET_PROFILE_IMAGE = `user.set_profile_image`;
+    public static readonly DELETE_PROFILE_IMAGE = `user.delete_profile_image`;
     public static readonly SET_PRESENT = `user.set_present`;
     public static readonly UPDATE_SELF = `user.update_self`;
     public static readonly TOGGLE_PRESENCE_BY_NUMBER = `user.toggle_presence_by_number`;

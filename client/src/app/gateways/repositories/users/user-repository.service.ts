@@ -442,6 +442,13 @@ export class UserRepositoryService extends BaseRepository<ViewUser, User> {
         await this.sendActionToBackend(UserAction.SET_PROFILE_IMAGE, payload);
     }
 
+    public async deleteProfileImage(user: Identifiable): Promise<void> {
+        const payload = {
+            id: user.id
+        };
+        await this.sendActionToBackend(UserAction.DELETE_PROFILE_IMAGE, payload);
+    }
+
     /**
      * Resets the passwords of all given users to their default ones. The operator will
      * not be changed (if provided in `users`).

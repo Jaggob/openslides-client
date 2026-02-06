@@ -76,6 +76,14 @@
                 >
                     {{ 'Upload profile image' | translate }}
                 </button>
+                <button
+                    mat-stroked-button
+                    type="button"
+                    [disabled]="!canEditProfileImage || !profileImageUrl || profileImageUploading"
+                    (click)="onProfileImageDelete()"
+                >
+                    {{ 'Remove profile image' | translate }}
+                </button>
                 <input
                     #profileImageInput
                     type="file"

@@ -358,12 +358,14 @@ export class AccountDetailComponent extends BaseComponent implements OnInit {
     private async createUser(): Promise<void> {
         const payload = this.getPartialUserPayload(true);
         const identifiable = (await this.userController.create(payload))[0];
+        await this._detailView?.commitProfileImageChanges(identifiable);
         this.router.navigate([`..`, identifiable.id], { relativeTo: this.route });
     }
 
     private async updateUser(): Promise<void> {
         const payload = this.getPartialUserPayload(false);
         await this.userController.update(payload, this.user!).resolve();
+        await this._detailView?.commitProfileImageChanges(this.user);
         this.router.navigate([`..`], { relativeTo: this.route });
     }
 

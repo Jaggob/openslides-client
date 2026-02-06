@@ -3,7 +3,7 @@ import { MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslateService } from '@ngx-translate/core';
 import { Permission } from 'src/app/domain/definitions/permission';
-import { PasswordForm, PasswordFormComponent } from 'src/app/site/modules/user-components';
+import { PasswordForm, PasswordFormComponent, UserDetailViewComponent } from 'src/app/site/modules/user-components';
 import { ViewGroup } from 'src/app/site/pages/meetings/pages/participants';
 import { MeetingControllerService } from 'src/app/site/pages/meetings/services/meeting-controller.service';
 import { ViewMeeting } from 'src/app/site/pages/meetings/view-models/view-meeting';
@@ -33,6 +33,8 @@ enum MenuItems {
 export class AccountDialogComponent extends BaseUiComponent implements OnInit {
     @ViewChild(`changePasswordComponent`, { static: false })
     public changePasswordComponent!: PasswordFormComponent;
+    @ViewChild(UserDetailViewComponent)
+    private userDetailView: UserDetailViewComponent;
 
     private readonly menuItems: MenuItem[] = [
         {
@@ -183,6 +185,7 @@ export class AccountDialogComponent extends BaseUiComponent implements OnInit {
             } else {
                 await this.repo.updateSelf(payload, this.self);
             }
+            await this.userDetailView?.commitProfileImageChanges(this.self);
         }
         this.isUserFormValid = false;
         this.isEditing = false;

@@ -289,17 +289,19 @@ export class ParticipantCreateWizardComponent extends BaseMeetingComponent imple
                         dirtyPayload[field] = payload[field];
                     }
                 }
-                this.repo
+                await this.repo
                     .update(dirtyPayload, {
                         ...payload,
                         id: this._accountId
                     })
                     .resolve();
                 if (this.personalInfoFormValue.is_present) {
-                    this.repo.setPresent(true, { ...payload, id: this._accountId }).resolve();
+                    await this.repo.setPresent(true, { ...payload, id: this._accountId }).resolve();
                 }
+                await this.detailView?.commitProfileImageChanges({ id: this._accountId });
             } else {
-                this.repo.create(payload);
+                const created = await this.repo.create(payload);
+                await this.detailView?.commitProfileImageChanges(created[0]);
             }
             this.onCancel();
         };
