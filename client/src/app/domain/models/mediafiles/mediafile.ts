@@ -30,6 +30,7 @@ export class Mediafile extends BaseModel<Mediafile> {
 
     public parent_id!: Id; // mediafile/child_ids;
     public child_ids!: Id[]; // (mediafile/parent_id)[];
+    public profile_image_ids!: Id[]; // (profile_image/mediafile_id)[];
 
     public constructor(input?: any) {
         super(Mediafile.COLLECTION, input);
@@ -61,6 +62,7 @@ export class Mediafile extends BaseModel<Mediafile> {
         `published_to_meetings_in_organization_id`,
         `parent_id`,
         `child_ids`,
+        `profile_image_ids`,
         `owner_id`,
         `meeting_mediafile_ids`
     ];

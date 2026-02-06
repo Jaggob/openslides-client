@@ -47,7 +47,8 @@ export class MediafileRepositoryService extends BaseRepository<ViewMediafile, Me
             `create_timestamp`,
             `pdf_information`,
             `published_to_meetings_in_organization_id`,
-            `filename`
+            `filename`,
+            `profile_image_ids`
         ]);
         const organizationListFields: TypedFieldset<Mediafile> = baseListFields.concat([`token`]);
         return {

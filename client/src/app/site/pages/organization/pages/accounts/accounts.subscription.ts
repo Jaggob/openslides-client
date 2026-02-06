@@ -23,14 +23,20 @@ export const getAccountDetailSubscriptionConfig: SubscriptionConfigGenerator = (
             { idField: `home_committee_id`, fieldset: [`name`] },
             {
                 idField: `profile_image_id`,
-                fieldset: [
-                    `id`,
-                    `filename`,
-                    `mimetype`,
-                    `is_directory`,
-                    `owner_id`,
-                    `published_to_meetings_in_organization_id`,
-                    `meeting_mediafile_ids`
+                fieldset: [`id`, `user_id`, `mediafile_id`, `create_timestamp`],
+                follow: [
+                    {
+                        idField: `mediafile_id`,
+                        fieldset: [
+                            `id`,
+                            `filename`,
+                            `mimetype`,
+                            `is_directory`,
+                            `owner_id`,
+                            `published_to_meetings_in_organization_id`,
+                            `meeting_mediafile_ids`
+                        ]
+                    }
                 ]
             }
         ]

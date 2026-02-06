@@ -78,9 +78,9 @@ export class MediafileControllerService extends BaseController<ViewMediafile, Me
                     // instead of being null or undefined, for the root dir
                     // mediafile.parent_id is simply not the in object
                     if (!mediafile.parent_id && !parentId) {
-                        return true;
+                        return !mediafile.profile_image_ids?.length;
                     } else {
-                        return mediafile.parent_id === parentId;
+                        return mediafile.parent_id === parentId && !mediafile.profile_image_ids?.length;
                     }
                 })
             )

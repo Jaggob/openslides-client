@@ -72,28 +72,34 @@ export const getParticipantListSubscriptionConfig: SubscriptionConfigGenerator =
                     idField: `meeting_user_ids`,
                     fieldset: `participantListMinimal`,
                     follow: [
-                    {
-                        idField: `user_id`,
-                        fieldset: `participantList`,
-                        follow: [
-                            { idField: `gender_id`, fieldset: [`name`] },
-                            {
-                                idField: `profile_image_id`,
-                                fieldset: [
-                                    `id`,
-                                    `filename`,
-                                    `mimetype`,
-                                    `is_directory`,
-                                    `owner_id`,
-                                    `published_to_meetings_in_organization_id`,
-                                    `meeting_mediafile_ids`
-                                ]
-                            },
-                            { idField: `home_committee_id`, fieldset: [`name`] }
-                        ]
-                    }
-                ]
-            }
+                        {
+                            idField: `user_id`,
+                            fieldset: `participantList`,
+                            follow: [
+                                { idField: `gender_id`, fieldset: [`name`] },
+                                {
+                                    idField: `profile_image_id`,
+                                    fieldset: [`id`, `user_id`, `mediafile_id`, `create_timestamp`],
+                                    follow: [
+                                        {
+                                            idField: `mediafile_id`,
+                                            fieldset: [
+                                                `id`,
+                                                `filename`,
+                                                `mimetype`,
+                                                `is_directory`,
+                                                `owner_id`,
+                                                `published_to_meetings_in_organization_id`,
+                                                `meeting_mediafile_ids`
+                                            ]
+                                        }
+                                    ]
+                                },
+                                { idField: `home_committee_id`, fieldset: [`name`] }
+                            ]
+                        }
+                    ]
+                }
             ]
         },
         subscriptionName: PARTICIPANT_LIST_SUBSCRIPTION
@@ -120,14 +126,20 @@ export const getParticipantMinimalSubscriptionConfig: SubscriptionConfigGenerato
                             },
                             {
                                 idField: `profile_image_id`,
-                                fieldset: [
-                                    `id`,
-                                    `filename`,
-                                    `mimetype`,
-                                    `is_directory`,
-                                    `owner_id`,
-                                    `published_to_meetings_in_organization_id`,
-                                    `meeting_mediafile_ids`
+                                fieldset: [`id`, `user_id`, `mediafile_id`, `create_timestamp`],
+                                follow: [
+                                    {
+                                        idField: `mediafile_id`,
+                                        fieldset: [
+                                            `id`,
+                                            `filename`,
+                                            `mimetype`,
+                                            `is_directory`,
+                                            `owner_id`,
+                                            `published_to_meetings_in_organization_id`,
+                                            `meeting_mediafile_ids`
+                                        ]
+                                    }
                                 ]
                             }
                         ]
@@ -152,14 +164,20 @@ export const getParticipantDetailSubscription: SubscriptionConfigGenerator = (id
             },
             {
                 idField: `profile_image_id`,
-                fieldset: [
-                    `id`,
-                    `filename`,
-                    `mimetype`,
-                    `is_directory`,
-                    `owner_id`,
-                    `published_to_meetings_in_organization_id`,
-                    `meeting_mediafile_ids`
+                fieldset: [`id`, `user_id`, `mediafile_id`, `create_timestamp`],
+                follow: [
+                    {
+                        idField: `mediafile_id`,
+                        fieldset: [
+                            `id`,
+                            `filename`,
+                            `mimetype`,
+                            `is_directory`,
+                            `owner_id`,
+                            `published_to_meetings_in_organization_id`,
+                            `meeting_mediafile_ids`
+                        ]
+                    }
                 ]
             }
         ]

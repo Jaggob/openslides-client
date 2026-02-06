@@ -11,10 +11,10 @@ import { ViewGroup } from '../pages/participants/modules/groups/view-models/view
 import { ViewStructureLevel } from '../pages/participants/pages/structure-levels/view-models';
 import { ViewOption, ViewPoll, ViewVote } from '../pages/polls';
 import { ViewPollCandidate } from '../pages/polls/view-models/view-poll-candidate';
-import { ViewMediafile } from '../pages/mediafiles/view-models/view-mediafile';
 import { DelegationType } from './delegation-type';
 import { ViewMeeting } from './view-meeting';
 import { ViewMeetingUser } from './view-meeting-user';
+import { ViewProfileImage } from './view-profile-image';
 
 export enum DuplicateStatus {
     None,
@@ -410,7 +410,7 @@ interface IUserRelations {
     votes: ViewVote[];
     poll_candidates: ViewPollCandidate[];
     gender?: ViewGender;
-    profile_image?: ViewMediafile;
+    profile_image?: ViewProfileImage;
     history_positions: ViewHistoryPosition[];
 }
 

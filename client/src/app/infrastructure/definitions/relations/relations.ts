@@ -64,6 +64,7 @@ import {
 } from '../../../site/pages/meetings/pages/projectors';
 import { Projectable } from '../../../site/pages/meetings/view-models/projectable';
 import { ViewMeeting } from '../../../site/pages/meetings/view-models/view-meeting';
+import { ViewProfileImage } from '../../../site/pages/meetings/view-models/view-profile-image';
 import { ViewUser } from '../../../site/pages/meetings/view-models/view-user';
 import { ViewCommittee } from '../../../site/pages/organization/pages/committees';
 import { ViewTheme } from '../../../site/pages/organization/pages/designs';
@@ -297,9 +298,25 @@ export const RELATIONS: Relation[] = [
     }),
     {
         ownViewModels: [ViewUser],
-        foreignViewModel: ViewMediafile,
+        foreignViewModel: ViewProfileImage,
         ownField: `profile_image`,
         ownIdField: `profile_image_id`,
+        many: false,
+        generic: false
+    },
+    {
+        ownViewModels: [ViewProfileImage],
+        foreignViewModel: ViewMediafile,
+        ownField: `mediafile`,
+        ownIdField: `mediafile_id`,
+        many: false,
+        generic: false
+    },
+    {
+        ownViewModels: [ViewProfileImage],
+        foreignViewModel: ViewUser,
+        ownField: `user`,
+        ownIdField: `user_id`,
         many: false,
         generic: false
     },
