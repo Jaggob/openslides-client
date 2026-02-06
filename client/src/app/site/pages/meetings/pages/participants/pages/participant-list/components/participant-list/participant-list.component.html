@@ -57,7 +57,7 @@
         <div class="nameCell">
             <div class="avatar" [class.has-image]="!!user.profile_image?.url">
                 @if (user.profile_image?.url) {
-                    <img [src]="user.profile_image.url" [alt]="user.short_name" />
+                    <img [src]="user.profile_image.url" [alt]="user.short_name" loading="lazy" />
                 }
             </div>
             <div>

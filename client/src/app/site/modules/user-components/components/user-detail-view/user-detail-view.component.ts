@@ -258,15 +258,23 @@ export class UserDetailViewComponent extends BaseUiComponent implements OnInit, 
             input.value = ``;
             return;
         }
-        if (this.profileImagePreviewUrl) {
-            URL.revokeObjectURL(this.profileImagePreviewUrl);
+        this.profileImageUploading = true;
+        try {
+            const resizedFile = await this.resizeProfileImage(file);
+            if (this.profileImagePreviewUrl) {
+                URL.revokeObjectURL(this.profileImagePreviewUrl);
+            }
+            this.profileImagePreviewUrl = URL.createObjectURL(resizedFile);
+            this.pendingProfileImageFile = resizedFile;
+            this.pendingProfileImageDelete = false;
+            this._hasChanges = true;
+            this.propagateValues();
+        } catch (error) {
+            this.profileImageUploadError = this.translate.instant(`Profile image processing failed`);
+        } finally {
+            this.profileImageUploading = false;
+            input.value = ``;
         }
-        this.profileImagePreviewUrl = URL.createObjectURL(file);
-        this.pendingProfileImageFile = file;
-        this.pendingProfileImageDelete = false;
-        this._hasChanges = true;
-        this.propagateValues();
-        input.value = ``;
     }
 
     public async onProfileImageDelete(): Promise<void> {
@@ -479,6 +487,52 @@ export class UserDetailViewComponent extends BaseUiComponent implements OnInit, 
         this.pendingProfileImageFile = null;
         this.pendingProfileImageDelete = false;
         this.profileImageUploadError = null;
+    }
+
+    private async resizeProfileImage(file: File): Promise<File> {
+        const image = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        try {
+            await new Promise<void>((resolve, reject) => {
+                image.onload = () => resolve();
+                image.onerror = () => reject(new Error(`Image load failed`));
+                image.src = objectUrl;
+            });
+        } finally {
+            URL.revokeObjectURL(objectUrl);
+        }
+
+        const targetSize = 250;
+        const canvas = document.createElement(`canvas`);
+        canvas.width = targetSize;
+        canvas.height = targetSize;
+        const ctx = canvas.getContext(`2d`);
+        if (!ctx) {
+            throw new Error(`Canvas not supported`);
+        }
+
+        const minSide = Math.min(image.width, image.height);
+        const sx = Math.max(0, (image.width - minSide) / 2);
+        const sy = Math.max(0, (image.height - minSide) / 2);
+        ctx.drawImage(image, sx, sy, minSide, minSide, 0, 0, targetSize, targetSize);
+
+        const blob = await new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob(
+                result => {
+                    if (result) {
+                        resolve(result);
+                    } else {
+                        reject(new Error(`Image encode failed`));
+                    }
+                },
+                `image/jpeg`,
+                0.85
+            );
+        });
+
+        const baseName = file.name.replace(/\.[^/.]+$/, ``) || `profile-image`;
+        const fileName = `${baseName}.jpg`;
+        return new File([blob], fileName, { type: blob.type, lastModified: Date.now() });
     }
 
     private noSpaceValidator(): ValidationErrors | null {

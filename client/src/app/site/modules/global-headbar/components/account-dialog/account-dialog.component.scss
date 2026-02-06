@@ -40,3 +40,8 @@ cdk-virtual-scroll-viewport {
 .padding-top-16 {
     padding-top: 16px !important;
 }
+
+:host ::ng-deep os-user-detail-view .profile-image {
+    width: 120px;
+    height: 120px;
+}
