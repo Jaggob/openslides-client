@@ -57,6 +57,37 @@
 
 <ng-template #editTemplate>
     <form [formGroup]="personalInfoForm">
+        <div class="profile-image-section">
+            <div class="profile-image-wrapper">
+                @if (profileImageUrl) {
+                    <img class="profile-image" [src]="profileImageUrl" [alt]="user?.short_name" />
+                } @else {
+                    <div class="profile-image placeholder">
+                        <mat-icon>person</mat-icon>
+                    </div>
+                }
+            </div>
+            <div class="profile-image-actions">
+                <button
+                    mat-stroked-button
+                    type="button"
+                    [disabled]="!canEditProfileImage || profileImageUploading"
+                    (click)="profileImageInput.click()"
+                >
+                    {{ 'Upload profile image' | translate }}
+                </button>
+                <input
+                    #profileImageInput
+                    type="file"
+                    accept="image/*"
+                    (change)="onProfileImageSelected($event)"
+                    hidden
+                />
+                @if (profileImageUploadError) {
+                    <div class="profile-image-error">{{ profileImageUploadError }}</div>
+                }
+            </div>
+        </div>
         <h2>{{ 'Personal information' | translate }}</h2>
         <!-- First line -->
         @if (!isAccountSelfUpdate) {
@@ -210,6 +241,17 @@
 </ng-template>
 
 <ng-template #showTemplate>
+    <div class="profile-image-section">
+        <div class="profile-image-wrapper">
+            @if (profileImageUrl) {
+                <img class="profile-image" [src]="profileImageUrl" [alt]="user?.short_name" />
+            } @else {
+                <div class="profile-image placeholder">
+                    <mat-icon>person</mat-icon>
+                </div>
+            }
+        </div>
+    </div>
     <h2 [class.header-margin]="!useBottomMargin">{{ 'Personal information' | translate }}</h2>
     @if (user) {
         <!-- Displayed name -->

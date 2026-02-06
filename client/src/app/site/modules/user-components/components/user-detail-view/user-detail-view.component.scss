@@ -63,3 +63,42 @@ mat-card mat-card-content h2 {
     margin-top: 0 !important;
     margin-bottom: 0 !important;
 }
+
+.profile-image-section {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.profile-image-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.profile-image {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #f2f2f2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    mat-icon {
+        color: #757575;
+    }
+}
+
+.profile-image-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.profile-image-error {
+    color: #d32f2f;
+    font-size: 12px;
+}

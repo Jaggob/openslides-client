@@ -24,6 +24,8 @@ import { map, OperatorFunction, Subscription } from 'rxjs';
 import { createEmailValidator } from 'src/app/infrastructure/utils/validators/email';
 import { getGenderListSubscriptionConfig } from 'src/app/site/pages/organization/pages/accounts/pages/gender/gender.subscription';
 import { GenderControllerService } from 'src/app/site/pages/organization/pages/accounts/pages/gender/services/gender-controller.service';
+import { UserRepositoryService } from 'src/app/gateways/repositories/users';
+import { OML } from 'src/app/domain/definitions/organization-permission';
 import { OperatorService } from 'src/app/site/services/operator.service';
 import { BaseUiComponent } from 'src/app/ui/base/base-ui-component';
 
@@ -53,6 +55,11 @@ export class UserDetailViewComponent extends BaseUiComponent implements OnInit, 
     public set user(user: ViewUser | null) {
         const oldUser = this._user;
         this._user = user;
+        if (this.profileImagePreviewUrl) {
+            URL.revokeObjectURL(this.profileImagePreviewUrl);
+            this.profileImagePreviewUrl = null;
+        }
+        this.profileImageUploadError = null;
         if (!oldUser) {
             this.prepareForm();
         } else if (this.selfUpdateEnabled) {
@@ -139,6 +146,14 @@ export class UserDetailViewComponent extends BaseUiComponent implements OnInit, 
         return this.operator.operatorId === this._user?.id;
     }
 
+    public get canEditProfileImage(): boolean {
+        return this.isSelf || this.operator.hasOrganizationPermissions(OML.superadmin);
+    }
+
+    public get profileImageUrl(): string | null {
+        return this.profileImagePreviewUrl ?? this.user?.profile_image?.url ?? null;
+    }
+
     public genderListSubscriptionConfig = getGenderListSubscriptionConfig();
 
     public genderPipeFn: OperatorFunction<any, any> = map(items => {
@@ -174,12 +189,17 @@ export class UserDetailViewComponent extends BaseUiComponent implements OnInit, 
 
     private selfUpdateEnabled = false;
 
+    public profileImageUploadError: string | null = null;
+    public profileImageUploading = false;
+    private profileImagePreviewUrl: string | null = null;
+
     public constructor(
         private fb: UntypedFormBuilder,
         private operator: OperatorService,
         public genderRepo: GenderControllerService,
         private cd: ChangeDetectorRef,
-        private translate: TranslateService
+        private translate: TranslateService,
+        private userRepo: UserRepositoryService
     ) {
         super();
     }
@@ -203,6 +223,31 @@ export class UserDetailViewComponent extends BaseUiComponent implements OnInit, 
 
     public isAllowed(permission: string): boolean {
         return this.isAllowedFn(permission);
+    }
+
+    public async onProfileImageSelected(event: Event): Promise<void> {
+        if (!this.user || !this.canEditProfileImage) {
+            return;
+        }
+        const input = event.target as HTMLInputElement;
+        if (!input.files || input.files.length === 0) {
+            return;
+        }
+        const file = input.files[0];
+        this.profileImageUploadError = null;
+        this.profileImageUploading = true;
+        if (this.profileImagePreviewUrl) {
+            URL.revokeObjectURL(this.profileImagePreviewUrl);
+        }
+        this.profileImagePreviewUrl = URL.createObjectURL(file);
+        try {
+            await this.userRepo.setProfileImage(this.user, file);
+        } catch (error) {
+            this.profileImageUploadError = this.translate.instant(`Profile image upload failed`);
+        } finally {
+            this.profileImageUploading = false;
+            input.value = ``;
+        }
     }
 
     public setRandomPassword(): void {

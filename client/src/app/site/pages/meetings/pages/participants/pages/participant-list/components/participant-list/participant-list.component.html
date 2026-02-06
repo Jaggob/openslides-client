@@ -55,6 +55,13 @@
             <a class="detail-link" [attr.aria-label]="ariaLabel(user)" [routerLink]="user.id"></a>
         }
         <div class="nameCell">
+            <div class="avatar">
+                @if (user.profile_image?.url) {
+                    <img [src]="user.profile_image.url" [alt]="user.short_name" />
+                } @else {
+                    <mat-icon>person</mat-icon>
+                }
+            </div>
             <div>
                 <div class="title-line flex-vertical-center">
                     <div>{{ user.short_name }}</div>

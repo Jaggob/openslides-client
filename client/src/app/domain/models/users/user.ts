@@ -37,6 +37,7 @@ export class User extends BaseDecimalModel<User> {
     public readonly saml_id!: string;
     public readonly member_number!: string;
     public readonly external!: boolean;
+    public readonly profile_image_id!: Id;
 
     // Meeting and committee
     public meeting_ids!: Id[]; // (meeting/user_ids)[];
@@ -86,6 +87,7 @@ export class User extends BaseDecimalModel<User> {
         `last_login`,
         `external`,
         `gender_id`,
+        `profile_image_id`,
         `organization_management_level`,
         `is_present_in_meeting_ids`,
         `committee_ids`,

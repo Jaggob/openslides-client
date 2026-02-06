@@ -14,6 +14,7 @@ import { Displayable } from '../../../domain/interfaces/displayable';
 import { Identifiable } from '../../../domain/interfaces/identifiable';
 import { User, UserSortProperty } from '../../../domain/models/users/user';
 import { PreventedInDemoError } from '../../../infrastructure/errors';
+import { toBase64 } from '../../../infrastructure/utils/functions';
 import { toDecimal } from '../../../infrastructure/utils';
 import { ViewUser } from '../../../site/pages/meetings/view-models/view-user';
 import { Fieldsets, TypedFieldset } from '../../../site/services/model-request-builder';
@@ -106,6 +107,7 @@ export class UserRepositoryService extends BaseRepository<ViewUser, User> {
             `pronoun`,
             `username` /* Required! To getShortName */,
             `gender_id`,
+            `profile_image_id`,
             `default_vote_weight`,
             `is_physical_person`,
             `is_active`,
@@ -429,6 +431,15 @@ export class UserRepositoryService extends BaseRepository<ViewUser, User> {
             new_password: newPassword
         };
         return this.sendActionToBackend(UserAction.SET_PASSWORD_SELF, payload);
+    }
+
+    public async setProfileImage(user: Identifiable, file: File): Promise<void> {
+        const payload = {
+            id: user.id,
+            file: await toBase64(file),
+            filename: file.name
+        };
+        await this.sendActionToBackend(UserAction.SET_PROFILE_IMAGE, payload);
     }
 
     /**
