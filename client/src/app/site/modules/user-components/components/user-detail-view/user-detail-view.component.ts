@@ -92,6 +92,9 @@ export class UserDetailViewComponent extends BaseUiComponent implements OnInit, 
     public useAdditionalEditTemplate = true;
 
     @Input()
+    public profileImageLayout: `top` | `side` = `top`;
+
+    @Input()
     public set additionalFormControls(controls: any) {
         this._additionalFormControls = controls;
         this.prepareForm();

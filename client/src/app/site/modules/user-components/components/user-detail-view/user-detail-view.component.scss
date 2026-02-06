@@ -71,6 +71,39 @@ mat-card mat-card-content h2 {
     margin-bottom: 16px;
 }
 
+.profile-layout {
+    &.side {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        column-gap: 24px;
+        align-items: start;
+        grid-auto-flow: column;
+    }
+}
+
+.profile-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-self: stretch;
+    width: auto;
+}
+
+.profile-side {
+    flex: 0 0 auto;
+    justify-self: end;
+    align-self: start;
+    width: fit-content;
+    grid-column: 2;
+}
+
+.profile-layout.side .profile-main {
+    align-self: start;
+}
+
+.profile-layout.side .profile-image-section {
+    margin-top: 0;
+}
+
 .profile-image-wrapper {
     display: flex;
     align-items: center;
@@ -78,8 +111,8 @@ mat-card mat-card-content h2 {
 }
 
 .profile-image {
-    width: 72px;
-    height: 72px;
+    width: 160px;
+    height: 160px;
     border-radius: 50%;
     object-fit: cover;
     background: #f2f2f2;
@@ -89,6 +122,12 @@ mat-card mat-card-content h2 {
 
     mat-icon {
         color: #757575;
+    }
+}
+
+@include media-queries.set-breakpoint-upper(xs) {
+    .profile-layout.side {
+        grid-template-columns: 1fr;
     }
 }
 

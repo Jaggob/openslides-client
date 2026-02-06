@@ -57,16 +57,266 @@
 
 <ng-template #editTemplate>
     <form [formGroup]="personalInfoForm">
-        <div class="profile-image-section">
-            <div class="profile-image-wrapper">
-                @if (profileImageUrl) {
-                    <img class="profile-image" [src]="profileImageUrl" [alt]="user?.short_name" />
-                } @else {
-                    <div class="profile-image placeholder">
-                        <mat-icon>person</mat-icon>
+        <div class="profile-layout" [class.side]="profileImageLayout === 'side'">
+            <div class="profile-main">
+                @if (profileImageLayout !== 'side') {
+                    <ng-container [ngTemplateOutlet]="profileImageSection"></ng-container>
+                }
+                <h2>{{ 'Personal information' | translate }}</h2>
+                <!-- First line -->
+                @if (!isAccountSelfUpdate) {
+                    <div class="personal-info-area">
+                        <!-- Title -->
+                        <mat-form-field class="form16 force-min-width">
+                            <mat-label>{{ 'Title' | translate }}</mat-label>
+                            <input formControlName="title" matInput type="text" />
+                        </mat-form-field>
+                        <!-- First name -->
+                        <mat-form-field class="form38 force-min-width">
+                            <mat-label>{{ 'Given name' | translate }}</mat-label>
+                            <input formControlName="first_name" matInput osAutofocus type="text" />
+                        </mat-form-field>
+                        <!-- Last name -->
+                        <mat-form-field class="form38 force-min-width">
+                            <mat-label>{{ 'Surname' | translate }}</mat-label>
+                            <input formControlName="last_name" matInput type="text" />
+                        </mat-form-field>
+                    </div>
+                }
+
+                <!-- Second line -->
+                <div class="personal-info-area">
+                    <!-- Gender -->
+                    @if (disableGenderField) {
+                        <mat-form-field class="form58 force-min-width">
+                            <mat-label>{{ 'Gender' | translate }}</mat-label>
+                            <input matInput readonly value="{{ genderName | translate }}" />
+                        </mat-form-field>
+                    } @else {
+                        <mat-form-field class="form58 force-min-width">
+                            <mat-label>{{ 'Gender' | translate }}</mat-label>
+                            <os-repo-search-selector
+                                formControlName="gender_id"
+                                [includeNone]="true"
+                                [pipeFn]="genderPipeFn"
+                                [repo]="genderRepo"
+                                [subscriptionConfig]="genderListSubscriptionConfig"
+                            ></os-repo-search-selector>
+                        </mat-form-field>
+                    }
+                    <!-- Pronoun -->
+                    <mat-form-field class="form38 force-min-width">
+                        <mat-label>{{ 'Pronoun' | translate }}</mat-label>
+                        <input formControlName="pronoun" matInput type="text" />
+                        <mat-error>{{ 'max. 32 characters allowed' | translate }}</mat-error>
+                    </mat-form-field>
+                </div>
+
+                <!-- Third line -->
+                <div class="personal-info-area">
+                    <!-- E-Mail -->
+                    <mat-form-field
+                        class="force-min-width"
+                        [ngClass]="{
+                            form58: isAllowed('update') && !isAccountSelfUpdate,
+                            form100: !isAllowed('update') || isAccountSelfUpdate
+                        }"
+                    >
+                        <mat-label>{{ 'Email' | translate }}</mat-label>
+                        <input autocomplete="off" formControlName="email" matInput name="email" type="email" />
+                        @if (personalInfoForm.get('email')?.hasError('email')) {
+                            <mat-error>
+                                {{ 'Please enter a valid email address!' | translate }}
+                            </mat-error>
+                        }
+                    </mat-form-field>
+                    <!-- Member Number -->
+                    @if (isAllowed('update') && !isAccountSelfUpdate) {
+                        <mat-form-field class="form38 force-min-width">
+                            <mat-label>{{ 'Membership number' | translate }}</mat-label>
+                            <input formControlName="member_number" matInput type="text" />
+                        </mat-form-field>
+                    }
+                </div>
+
+                <!-- Fourth line -->
+                <div class="personal-info-area">
+                    <!-- username -->
+                    @if (isAllowed('seePersonal')) {
+                        <mat-form-field
+                            class="force-min-width"
+                            [ngClass]="{
+                                form48: isAllowed('update') && !isAccountSelfUpdate,
+                                form100: !isAllowed('update') || isAccountSelfUpdate
+                            }"
+                        >
+                            <mat-label>{{ 'Username' | translate }}</mat-label>
+                            <input formControlName="username" matInput type="text" />
+                            @if (isNewUser) {
+                                <button
+                                    mat-icon-button
+                                    matSuffix
+                                    matTooltipPosition="above"
+                                    type="button"
+                                    [matTooltip]="'Leave blank to automatically generate the username.' | translate"
+                                >
+                                    <mat-icon>help</mat-icon>
+                                </button>
+                            }
+                            @if (personalInfoForm.controls['username'].errors?.['required']) {
+                                <mat-error translate>You have to enter at least one character</mat-error>
+                            }
+                            @if (personalInfoForm.controls['username'].errors?.['noSpace']) {
+                                <mat-error translate>Username may not contain spaces</mat-error>
+                            }
+                        </mat-form-field>
+                    }
+
+                    <!-- Initial Password -->
+                    @if (isAllowed('update') && !user?.saml_id && !isAccountSelfUpdate) {
+                        <mat-form-field class="form48 force-min-width">
+                            <mat-label>{{ 'Initial password' | translate }}</mat-label>
+                            <input autocomplete="off" formControlName="default_password" matInput />
+                            @if (isNewUser && generatePasswordFn) {
+                                <button
+                                    mat-icon-button
+                                    matSuffix
+                                    type="button"
+                                    [disabled]="!generatePasswordFn"
+                                    [matTooltip]="'Generate password' | translate"
+                                    (click)="setRandomPassword()"
+                                >
+                                    <mat-icon>autorenew</mat-icon>
+                                </button>
+                            }
+                            @if (isNewUser) {
+                                <button
+                                    mat-icon-button
+                                    matSuffix
+                                    type="button"
+                                    [matTooltip]="'Leave blank to automatically generate the password.' | translate"
+                                >
+                                    <mat-icon>help</mat-icon>
+                                </button>
+                            }
+                        </mat-form-field>
+                    }
+                </div>
+
+                @if (isAllowed('seeName') && !isAccountSelfUpdate) {
+                    <div>
+                        @if (!isSelf) {
+                            <mat-checkbox formControlName="is_active">{{ 'active' | translate }}</mat-checkbox>
+                        }
+                        <mat-checkbox formControlName="is_physical_person">{{ 'natural person' | translate }}</mat-checkbox>
                     </div>
                 }
             </div>
+            @if (profileImageLayout === 'side') {
+                <div class="profile-side">
+                    <ng-container [ngTemplateOutlet]="profileImageSection"></ng-container>
+                </div>
+            }
+        </div>
+    </form>
+</ng-template>
+
+<ng-template #showTemplate>
+    <div class="profile-layout" [class.side]="profileImageLayout === 'side'">
+        <div class="profile-main">
+            @if (profileImageLayout !== 'side') {
+                <ng-container [ngTemplateOutlet]="profileImageSection"></ng-container>
+            }
+            <h2 [class.header-margin]="!useBottomMargin">{{ 'Personal information' | translate }}</h2>
+            @if (user) {
+                <!-- Displayed name -->
+                @if (isAllowed('seeName')) {
+                    <div>
+                        <h4>{{ 'Name' | translate }}</h4>
+                        <span class="state-icons">
+                            <span>{{ user.short_name }}</span>
+                            @if (user.pronoun) {
+                                &nbsp;
+                                <span>({{ user.pronoun }})</span>
+                            }
+                            @if (!user.is_active && isAllowed('seeSensitiveData')) {
+                                <mat-icon class="red-warning-text" matTooltip="{{ 'Inactive' | translate }}">
+                                    do_not_disturb_on
+                                </mat-icon>
+                            }
+                            @if (!user.is_physical_person) {
+                                <mat-icon matTooltip="{{ 'Is no natural person' | translate }}">account_balance</mat-icon>
+                            }
+                            @if (user.hasSamlId && isAllowed('seeSensitiveData')) {
+                                <mat-icon matTooltip="{{ 'Has SSO identification' | translate }}">fingerprint</mat-icon>
+                            }
+                        </span>
+                    </div>
+                }
+                <!-- Gender -->
+                @if (user.gender) {
+                    <div>
+                        <h4>{{ 'Gender' | translate }}</h4>
+                        <span>{{ user.gender?.name | translate }}</span>
+                    </div>
+                }
+                <!-- Mail -->
+                @if (isAllowed('seeSensitiveData')) {
+                    <div>
+                        @if (user.email) {
+                            <div>
+                                <h4>{{ 'Email' | translate }}</h4>
+                                <span>{{ user.email }}</span>
+                            </div>
+                        }
+                        <!-- Membership number-->
+                        @if (user.member_number) {
+                            <div>
+                                <h4>{{ 'Membership number' | translate }}</h4>
+                                <span>{{ user.member_number }}</span>
+                            </div>
+                        }
+                        <!-- Username -->
+                        @if (user.username) {
+                            <div>
+                                <h4>{{ 'Username' | translate }}</h4>
+                                <span>{{ user.username }}</span>
+                            </div>
+                        }
+                        <!-- Initial Password -->
+                        @if (user.default_password && !user.saml_id && isAllowed('update')) {
+                    <div>
+                        <h4>{{ 'Initial password' | translate }}</h4>
+                        <span>{{ user.default_password }}</span>
+                    </div>
+                }
+                <!-- SAML id -->
+                @if (user.saml_id) {
+                    <div>
+                        <h4>{{ 'SSO Identification' | translate }}</h4>
+                        <span>{{ user.saml_id }}</span>
+                    </div>
+                        }
+                    </div>
+                }
+            }
+        </div>
+        @if (profileImageLayout === 'side') {
+            <div class="profile-side">
+                <ng-container [ngTemplateOutlet]="profileImageSection"></ng-container>
+            </div>
+        }
+    </div>
+</ng-template>
+
+<ng-template #profileImageSection>
+    <div class="profile-image-section">
+        <div class="profile-image-wrapper">
+            @if (profileImageUrl) {
+                <img class="profile-image" [src]="profileImageUrl" [alt]="user?.short_name" />
+            }
+        </div>
+        @if (isEditing) {
             <div class="profile-image-actions">
                 <button
                     mat-stroked-button
@@ -95,242 +345,6 @@
                     <div class="profile-image-error">{{ profileImageUploadError }}</div>
                 }
             </div>
-        </div>
-        <h2>{{ 'Personal information' | translate }}</h2>
-        <!-- First line -->
-        @if (!isAccountSelfUpdate) {
-            <div class="personal-info-area">
-                <!-- Title -->
-                <mat-form-field class="form16 force-min-width">
-                    <mat-label>{{ 'Title' | translate }}</mat-label>
-                    <input formControlName="title" matInput type="text" />
-                </mat-form-field>
-                <!-- First name -->
-                <mat-form-field class="form38 force-min-width">
-                    <mat-label>{{ 'Given name' | translate }}</mat-label>
-                    <input formControlName="first_name" matInput osAutofocus type="text" />
-                </mat-form-field>
-                <!-- Last name -->
-                <mat-form-field class="form38 force-min-width">
-                    <mat-label>{{ 'Surname' | translate }}</mat-label>
-                    <input formControlName="last_name" matInput type="text" />
-                </mat-form-field>
-            </div>
         }
-
-        <!-- Second line -->
-        <div class="personal-info-area">
-            <!-- Gender -->
-            @if (disableGenderField) {
-                <mat-form-field class="form58 force-min-width">
-                    <mat-label>{{ 'Gender' | translate }}</mat-label>
-                    <input matInput readonly value="{{ genderName | translate }}" />
-                </mat-form-field>
-            } @else {
-                <mat-form-field class="form58 force-min-width">
-                    <mat-label>{{ 'Gender' | translate }}</mat-label>
-                    <os-repo-search-selector
-                        formControlName="gender_id"
-                        [includeNone]="true"
-                        [pipeFn]="genderPipeFn"
-                        [repo]="genderRepo"
-                        [subscriptionConfig]="genderListSubscriptionConfig"
-                    ></os-repo-search-selector>
-                </mat-form-field>
-            }
-            <!-- Pronoun -->
-            <mat-form-field class="form38 force-min-width">
-                <mat-label>{{ 'Pronoun' | translate }}</mat-label>
-                <input formControlName="pronoun" matInput type="text" />
-                <mat-error>{{ 'max. 32 characters allowed' | translate }}</mat-error>
-            </mat-form-field>
-        </div>
-
-        <!-- Third line -->
-        <div class="personal-info-area">
-            <!-- E-Mail -->
-            <mat-form-field
-                class="force-min-width"
-                [ngClass]="{
-                    form58: isAllowed('update') && !isAccountSelfUpdate,
-                    form100: !isAllowed('update') || isAccountSelfUpdate
-                }"
-            >
-                <mat-label>{{ 'Email' | translate }}</mat-label>
-                <input autocomplete="off" formControlName="email" matInput name="email" type="email" />
-                @if (personalInfoForm.get('email')?.hasError('email')) {
-                    <mat-error>
-                        {{ 'Please enter a valid email address!' | translate }}
-                    </mat-error>
-                }
-            </mat-form-field>
-            <!-- Member Number -->
-            @if (isAllowed('update') && !isAccountSelfUpdate) {
-                <mat-form-field class="form38 force-min-width">
-                    <mat-label>{{ 'Membership number' | translate }}</mat-label>
-                    <input formControlName="member_number" matInput type="text" />
-                </mat-form-field>
-            }
-        </div>
-
-        <!-- Fourth line -->
-        <div class="personal-info-area">
-            <!-- username -->
-            @if (isAllowed('seePersonal')) {
-                <mat-form-field
-                    class="force-min-width"
-                    [ngClass]="{
-                        form48: isAllowed('update') && !isAccountSelfUpdate,
-                        form100: !isAllowed('update') || isAccountSelfUpdate
-                    }"
-                >
-                    <mat-label>{{ 'Username' | translate }}</mat-label>
-                    <input formControlName="username" matInput type="text" />
-                    @if (isNewUser) {
-                        <button
-                            mat-icon-button
-                            matSuffix
-                            matTooltipPosition="above"
-                            type="button"
-                            [matTooltip]="'Leave blank to automatically generate the username.' | translate"
-                        >
-                            <mat-icon>help</mat-icon>
-                        </button>
-                    }
-                    @if (personalInfoForm.controls['username'].errors?.['required']) {
-                        <mat-error translate>You have to enter at least one character</mat-error>
-                    }
-                    @if (personalInfoForm.controls['username'].errors?.['noSpace']) {
-                        <mat-error translate>Username may not contain spaces</mat-error>
-                    }
-                </mat-form-field>
-            }
-
-            <!-- Initial Password -->
-            @if (isAllowed('update') && !user?.saml_id && !isAccountSelfUpdate) {
-                <mat-form-field class="form48 force-min-width">
-                    <mat-label>{{ 'Initial password' | translate }}</mat-label>
-                    <input autocomplete="off" formControlName="default_password" matInput />
-                    @if (isNewUser && generatePasswordFn) {
-                        <button
-                            mat-icon-button
-                            matSuffix
-                            type="button"
-                            [disabled]="!generatePasswordFn"
-                            [matTooltip]="'Generate password' | translate"
-                            (click)="setRandomPassword()"
-                        >
-                            <mat-icon>autorenew</mat-icon>
-                        </button>
-                    }
-                    @if (isNewUser) {
-                        <button
-                            mat-icon-button
-                            matSuffix
-                            type="button"
-                            [matTooltip]="'Leave blank to automatically generate the password.' | translate"
-                        >
-                            <mat-icon>help</mat-icon>
-                        </button>
-                    }
-                </mat-form-field>
-            }
-        </div>
-
-        @if (isAllowed('seeName') && !isAccountSelfUpdate) {
-            <div>
-                @if (!isSelf) {
-                    <mat-checkbox formControlName="is_active">{{ 'active' | translate }}</mat-checkbox>
-                }
-                <mat-checkbox formControlName="is_physical_person">{{ 'natural person' | translate }}</mat-checkbox>
-            </div>
-        }
-    </form>
-</ng-template>
-
-<ng-template #showTemplate>
-    <div class="profile-image-section">
-        <div class="profile-image-wrapper">
-            @if (profileImageUrl) {
-                <img class="profile-image" [src]="profileImageUrl" [alt]="user?.short_name" />
-            } @else {
-                <div class="profile-image placeholder">
-                    <mat-icon>person</mat-icon>
-                </div>
-            }
-        </div>
     </div>
-    <h2 [class.header-margin]="!useBottomMargin">{{ 'Personal information' | translate }}</h2>
-    @if (user) {
-        <!-- Displayed name -->
-        @if (isAllowed('seeName')) {
-            <div>
-                <h4>{{ 'Name' | translate }}</h4>
-                <span class="state-icons">
-                    <span>{{ user.short_name }}</span>
-                    @if (user.pronoun) {
-                        &nbsp;
-                        <span>({{ user.pronoun }})</span>
-                    }
-                    @if (!user.is_active && isAllowed('seeSensitiveData')) {
-                        <mat-icon class="red-warning-text" matTooltip="{{ 'Inactive' | translate }}">
-                            do_not_disturb_on
-                        </mat-icon>
-                    }
-                    @if (!user.is_physical_person) {
-                        <mat-icon matTooltip="{{ 'Is no natural person' | translate }}">account_balance</mat-icon>
-                    }
-                    @if (user.hasSamlId && isAllowed('seeSensitiveData')) {
-                        <mat-icon matTooltip="{{ 'Has SSO identification' | translate }}">fingerprint</mat-icon>
-                    }
-                </span>
-            </div>
-        }
-        <!-- Gender -->
-        @if (user.gender) {
-            <div>
-                <h4>{{ 'Gender' | translate }}</h4>
-                <span>{{ user.gender?.name | translate }}</span>
-            </div>
-        }
-        <!-- Mail -->
-        @if (isAllowed('seeSensitiveData')) {
-            <div>
-                @if (user.email) {
-                    <div>
-                        <h4>{{ 'Email' | translate }}</h4>
-                        <span>{{ user.email }}</span>
-                    </div>
-                }
-                <!-- Membership number-->
-                @if (user.member_number) {
-                    <div>
-                        <h4>{{ 'Membership number' | translate }}</h4>
-                        <span>{{ user.member_number }}</span>
-                    </div>
-                }
-                <!-- Username -->
-                @if (user.username) {
-                    <div>
-                        <h4>{{ 'Username' | translate }}</h4>
-                        <span>{{ user.username }}</span>
-                    </div>
-                }
-                <!-- Initial Password -->
-                @if (user.default_password && !user.saml_id && isAllowed('update')) {
-                    <div>
-                        <h4>{{ 'Initial password' | translate }}</h4>
-                        <span>{{ user.default_password }}</span>
-                    </div>
-                }
-                <!-- SAML id -->
-                @if (user.saml_id) {
-                    <div>
-                        <h4>{{ 'SSO Identification' | translate }}</h4>
-                        <span>{{ user.saml_id }}</span>
-                    </div>
-                }
-            </div>
-        }
-    }
 </ng-template>

@@ -51,6 +51,14 @@ a {
     cursor: pointer;
 }
 
+.account-avatar {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+}
+
 .accountButton {
     background: var(--theme-headbar);
     color: var(--theme-headbar-contrast);

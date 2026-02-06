@@ -21,7 +21,11 @@
         </div>
     </div>
     <div class="fake-fab-button flex-center">
-        <mat-icon class="icon-16">person</mat-icon>
+        @if (user?.profile_image?.url) {
+            <img class="account-avatar" [src]="user.profile_image.url" [alt]="username" />
+        } @else {
+            <mat-icon class="icon-16">person</mat-icon>
+        }
     </div>
 </button>
 
