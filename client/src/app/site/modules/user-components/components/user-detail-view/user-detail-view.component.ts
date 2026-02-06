@@ -242,6 +242,18 @@ export class UserDetailViewComponent extends BaseUiComponent implements OnInit, 
         }
         const file = input.files[0];
         this.profileImageUploadError = null;
+        const allowedTypes = [`image/jpeg`, `image/png`, `image/gif`, `image/webp`, `image/bmp`];
+        if (!allowedTypes.includes(file.type)) {
+            this.profileImageUploadError = this.translate.instant(`Unsupported image format`);
+            input.value = ``;
+            return;
+        }
+        const maxSize = 5 * 1024 * 1024; // 5 MB
+        if (file.size > maxSize) {
+            this.profileImageUploadError = this.translate.instant(`Profile image exceeds maximum size of 5 MB.`);
+            input.value = ``;
+            return;
+        }
         if (this.profileImagePreviewUrl) {
             URL.revokeObjectURL(this.profileImagePreviewUrl);
         }
