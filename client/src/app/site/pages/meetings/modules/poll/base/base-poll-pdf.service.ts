@@ -657,14 +657,18 @@ export abstract class BasePollPdfService {
                   this.getUserNameForExport(this.userRepo.getViewModel(date.user_merged_into_id))
                 : this.getUserNameForExport(date.user);
             let represented = ``;
-            if (date.vote_delegated_to_user_id && !date.delegation_user_merged_into_id) {
+            if (date.vote_delegated_to_user_ids?.length && !date.delegation_user_merged_into_ids?.length) {
                 represented =
                     `\n${this.translate.instant(`represented by`)} ` +
-                    this.getUserNameForExport(date.vote_delegated_to);
-            } else if (date.vote_delegated_to_user_id && date.delegation_user_merged_into_id) {
+                    (date.vote_delegated_to || [])
+                        .map(user => this.getUserNameForExport(user))
+                        .join(`, `);
+            } else if (date.vote_delegated_to_user_ids?.length && date.delegation_user_merged_into_ids?.length) {
                 represented =
                     `\n${this.translate.instant(`represented by old account of`)} ` +
-                    this.getUserNameForExport(this.userRepo.getViewModel(date.delegation_user_merged_into_id));
+                    (date.delegation_user_merged_into_ids || [])
+                        .map(id => this.getUserNameForExport(this.userRepo.getViewModel(id)))
+                        .join(`, `);
             }
             const tableLine = [
                 {

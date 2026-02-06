@@ -95,9 +95,9 @@ export interface EntitledUsersEntry {
     user_id: number;
     present: boolean;
     voted: boolean;
-    vote_delegated_to_user_id?: number;
+    vote_delegated_to_user_ids?: number[];
     user_merged_into_id?: number;
-    delegation_user_merged_into_id?: number;
+    delegation_user_merged_into_ids?: number[];
 }
 
 export const VOTE_MAJORITY = -1;

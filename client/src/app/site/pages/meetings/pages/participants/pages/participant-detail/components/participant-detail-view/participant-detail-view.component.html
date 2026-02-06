@@ -122,10 +122,10 @@
                 </div>
             }
             <!-- Own Vote delegations -->
-            @if (user?.vote_delegated_to() && showVoteDelegations) {
+            @if (user?.vote_delegated_to()?.length && showVoteDelegations) {
                 <div>
                     <h4>{{ 'Voting right delegated to (proxy)' | translate }}</h4>
-                    <span>{{ user!.vote_delegated_to() }}</span>
+                    <span>{{ user!.delegationName() }}</span>
                 </div>
             }
             <!-- Received Vote delegations -->

@@ -4,7 +4,11 @@
         <div>
             <mat-icon class="vote-submitted">check_circle</mat-icon>
             <br />
-            <span>{{ 'Voting successful.' | translate }}</span>
+            @if (voteSuccessBy) {
+                <span>{{ 'Voting successful (voted by {{ user }}).' | translate: { user: voteSuccessBy } }}</span>
+            } @else {
+                <span>{{ 'Voting successful.' | translate }}</span>
+            }
         </div>
     }
 

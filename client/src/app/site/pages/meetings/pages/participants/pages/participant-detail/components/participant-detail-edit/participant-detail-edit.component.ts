@@ -3,7 +3,7 @@ import { Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { _ } from '@ngx-translate/core';
 import { TranslateService } from '@ngx-translate/core';
-import { combineLatest, Observable } from 'rxjs';
+import { combineLatest, map, Observable } from 'rxjs';
 import { Id } from 'src/app/domain/definitions/key-types';
 import { CML, OML } from 'src/app/domain/definitions/organization-permission';
 import { Permission } from 'src/app/domain/definitions/permission';
@@ -54,7 +54,7 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
         comment: [``],
         group_ids: [``],
         vote_delegations_from_ids: [``],
-        vote_delegated_to_id: [``],
+        vote_delegated_to_ids: [[]],
         is_present: [``],
         locked_out: [``],
         external: [``],
@@ -62,6 +62,16 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
     };
 
     public sortFn = (groupA: ViewGroup, groupB: ViewGroup): number => groupA.weight - groupB.weight;
+
+    public readonly delegationsToSelectablePipeFn = map((items: ViewUser[]) =>
+        this.canDelegateVote ? items.filter(user => user.id !== this._userId) : []
+    );
+
+    public readonly delegationsFromSelectablePipeFn = map((items: ViewUser[]) =>
+        this.canReceiveDelegations
+            ? items.filter(user => user.id !== this._userId && (user.vote_delegations_from()?.length ?? 0) === 0)
+            : []
+    );
 
     public get randomPasswordFn(): () => string {
         return () => this.getRandomPassword();
@@ -154,6 +164,35 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
     public get showVoteDelegations(): boolean {
         return this._isVoteDelegationEnabled;
     }
+
+    public get canDelegateVote(): boolean {
+        return (this.user?.vote_delegations_from()?.length ?? 0) === 0;
+    }
+
+    public get canReceiveDelegations(): boolean {
+        const delegatedToIds = (this.personalInfoFormValue?.vote_delegated_to_ids as Id[]) || null;
+        if (delegatedToIds) {
+            return delegatedToIds.length === 0;
+        }
+        return (this.user?.vote_delegated_to()?.length ?? 0) === 0;
+    }
+
+    public readonly isDelegationsToOptionDisabledFn = (user: ViewUser): boolean => {
+        const fromIds = (this.personalInfoFormValue?.vote_delegations_from_ids as Id[]) || [];
+        return user.id === this._userId || fromIds.includes(user.id);
+    };
+
+    public readonly isDelegationsFromOptionDisabledFn = (user: ViewUser): boolean => {
+        if (!this.canReceiveDelegations) {
+            return true;
+        }
+        const toIds = (this.personalInfoFormValue?.vote_delegated_to_ids as Id[]) || [];
+        return (
+            user.id === this._userId ||
+            toIds.includes(user.id) ||
+            (user.vote_delegations_from()?.length ?? 0) > 0
+        );
+    };
 
     public get saveButtonEnabled(): boolean {
         return this._userFormLoaded && this.isFormValid && !this.isLockedOutAndCanManage;
@@ -312,14 +351,11 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
         if (this.operator.hasPerms(Permission.userCanUpdate)) {
             this.checkForGroups(this.personalInfoFormValue);
             const isPresent = this.personalInfoFormValue.is_present || false;
-            if (this.personalInfoFormValue.vote_delegated_to_id === 0) {
-                this.personalInfoFormValue.vote_delegated_to_id = null;
-            }
             const payload = {
                 ...this.personalInfoFormValue,
-                vote_delegated_to_id: this.personalInfoFormValue.vote_delegated_to_id
-                    ? this.repo.getViewModel(this.personalInfoFormValue.vote_delegated_to_id).getMeetingUser().id
-                    : null,
+                vote_delegated_to_ids: (this.personalInfoFormValue.vote_delegated_to_ids || [])
+                    .map(id => this.repo.getViewModel(id).getMeetingUser().id)
+                    .filter(id => !!id),
                 vote_delegations_from_ids: this.personalInfoFormValue.vote_delegations_from_ids
                     ? this.personalInfoFormValue.vote_delegations_from_ids
                           .map(id => this.repo.getViewModel(id).getMeetingUser().id)

@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { _ } from '@ngx-translate/core';
+import { _, TranslateService } from '@ngx-translate/core';
 import { PollState, PollType } from 'src/app/domain/models/poll/poll-constants';
 import { ViewPoll } from 'src/app/site/pages/meetings/pages/polls';
 import { ViewUser } from 'src/app/site/pages/meetings/view-models/view-user';
@@ -43,7 +43,8 @@ export class VotingService {
     public constructor(
         private activeMeetingService: ActiveMeetingService,
         private operator: OperatorService,
-        private meetingSettingsService: MeetingSettingsService
+        private meetingSettingsService: MeetingSettingsService,
+        private translate: TranslateService
     ) {
         this.operator.userObservable.subscribe(user => (this._currentUser = user));
         this.meetingSettingsService
@@ -105,6 +106,13 @@ export class VotingService {
     public getVotingProhibitionReasonVerbose(poll: ViewPoll, user: ViewUser | null = this._currentUser): string | void {
         const reason = this.getVotingProhibitionReason(poll, user);
         if (reason) {
+            if (reason === VotingProhibition.USER_HAS_VOTED && user) {
+                const isCurrentUser = this._currentUser?.id === user.id;
+                const delegatedTo = isCurrentUser ? user.vote_delegated_to() : null;
+                const displayUser =
+                    isCurrentUser && delegatedTo?.length ? delegatedTo[0].getTitle() : user.getTitle();
+                return this.translate.instant(_(`{{ user }} has already voted.`), { user: displayUser });
+            }
             return VotingProhibitionVerbose[reason];
         }
     }

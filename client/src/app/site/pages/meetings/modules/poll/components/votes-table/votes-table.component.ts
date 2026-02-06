@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, Input, ViewEncapsulation } from '@a
 import { map, Observable } from 'rxjs';
 import { Permission } from 'src/app/domain/definitions/permission';
 import { PollContentObject } from 'src/app/domain/models/poll';
+import { ViewUser } from 'src/app/site/pages/meetings/view-models/view-user';
 
 import { BasePollDetailComponent, BaseVoteData } from '../../base/base-poll-detail.component';
 import { PollService } from '../../services/poll.service';
@@ -61,6 +62,17 @@ export class VotesTableComponent {
 
     public getVoteCSS(voteValue: string): string {
         return this.parent.voteOptionStyle[voteValue]?.css;
+    }
+
+    public getDelegationActorName(vote: BaseVoteData): string | null {
+        const anyVote: any = vote as any;
+        const delegatedMeetingUser = anyVote?.delegated_user ?? null;
+        const delegatedUser = delegatedMeetingUser?.user ?? null;
+        if (delegatedUser && vote.user && delegatedUser.id === vote.user.id) {
+            return null;
+        }
+        const name = delegatedUser?.getShortName?.()?.trim?.();
+        return name || null;
     }
 
     public getTemplateType(): string {

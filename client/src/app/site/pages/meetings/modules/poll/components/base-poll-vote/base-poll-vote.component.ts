@@ -162,10 +162,9 @@ export abstract class BasePollVoteComponent<C extends PollContentObject = any> e
         this.updatePollOptionTitleWidth();
         this.subscriptions.push(
             this.operator.userObservable.pipe(debounceTime(50)).subscribe(user => {
-                if (
-                    user &&
-                    (!user.getMeetingUser()?.vote_delegated_to_id || user.getMeetingUser()?.vote_delegated_to)
-                ) {
+                const delegatedIds = user?.getMeetingUser()?.vote_delegated_to_ids;
+                const delegatedList = user?.getMeetingUser()?.vote_delegated_to;
+                if (user && (!delegatedIds || delegatedIds.length === (delegatedList?.length ?? 0))) {
                     this.user = user;
                     this.delegations = user.vote_delegations_from();
                     this.voteRequestData[this.user.id] = { value: {} } as VotingData;
@@ -369,7 +368,25 @@ export abstract class BasePollVoteComponent<C extends PollContentObject = any> e
             this.alreadyVoted[userId] = true;
             this.poll.hasVoted = true; // Set it manually to `true`, because the server will do the same
         } catch (e: any) {
-            this.raiseError(e);
+            const isDelegationVote = this.user?.id !== userId;
+            const delegationUser = this._delegationsMap[userId] ?? this.user;
+            const alreadyVotedForDelegation = this.poll?.hasVotedForDelegations?.(userId) || false;
+            const alreadyVotedForUser = this.alreadyVoted[userId] || alreadyVotedForDelegation;
+            const errorMessage: string = e?.message ?? ``;
+            const isAlreadyVotedError =
+                /already voted/i.test(errorMessage) || /Stimme abgegeben/i.test(errorMessage);
+
+            if (delegationUser && (alreadyVotedForUser || isAlreadyVotedError)) {
+                const proxyUser =
+                    userId === this.user?.id && this.user?.vote_delegated_to()?.length
+                        ? this.user.vote_delegated_to()[0]
+                        : null;
+                const displayUser = proxyUser ? proxyUser.getTitle() : delegationUser.getTitle();
+                const msg = this.translate.instant(_(`{{ user }} has already voted.`), { user: displayUser });
+                this.raiseError(`${this.translate.instant(`Error`)}: ${msg}`);
+            } else {
+                this.raiseError(e);
+            }
         } finally {
             this.deliveringVote[userId] = false;
             this.cd.markForCheck();

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, Input } from '@angular/core';
 import { combineLatest, debounceTime, distinctUntilChanged } from 'rxjs';
+import { ParticipantControllerService } from 'src/app/site/pages/meetings/pages/participants/services/common/participant-controller.service/participant-controller.service';
 import { OperatorService } from 'src/app/site/services/operator.service';
 
 import { BaseMeetingComponent } from '../../../../base/base-meeting.component';
@@ -36,9 +37,39 @@ export class PollCannotVoteMessageComponent extends BaseMeetingComponent {
         return this.user?.isPresentInMeeting();
     }
 
+    public get voteSuccessBy(): string | null {
+        const targetUser = this.delegationUser ?? this.user;
+        if (!targetUser || !this.poll) {
+            return null;
+        }
+
+        const actorId = this.poll.getVoteActorIdForUser?.(targetUser.id) ?? null;
+        const actorUser = actorId ? this.userRepo.getViewModel(actorId) : null;
+
+        if (this.delegationUser) {
+            if (actorUser) {
+                return actorUser.getTitle();
+            }
+            if (actorId && actorId === this.delegationUser.id) {
+                return this.delegationUser.getTitle();
+            }
+            if (actorId && this.user && actorId === this.user.id) {
+                return this.user.getTitle();
+            }
+            return null;
+        }
+
+        if (actorUser && actorUser.id !== targetUser.id) {
+            return actorUser.getTitle();
+        }
+
+        return null;
+    }
+
     public constructor(
         operator: OperatorService,
         private votingService: VotingService,
+        private userRepo: ParticipantControllerService,
         private cd: ChangeDetectorRef
     ) {
         super();

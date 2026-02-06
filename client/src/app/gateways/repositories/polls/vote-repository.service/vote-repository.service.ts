@@ -52,7 +52,7 @@ export class VoteRepositoryService extends BaseMeetingRelatedRepository<ViewVote
     public getVerboseName = (plural = false): string => this.translate.instant(plural ? `Votes` : `Vote`);
 
     public async sendVote(pollId: Id, payload: VotePayload): Promise<void> {
-        const request: Promise<void> = this.http.post(`${VOTE_URL}?id=${pollId}`, payload);
+        const request: Promise<void> = this.http.post(`${VOTE_URL}?id=${pollId}`, payload, { catchError: false });
         request.then(() => {
             this.updateSubscription();
         });

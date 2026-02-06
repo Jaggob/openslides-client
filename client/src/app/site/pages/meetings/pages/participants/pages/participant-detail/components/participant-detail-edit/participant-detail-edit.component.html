@@ -122,6 +122,9 @@
                                 <os-repo-search-selector
                                     formControlName="vote_delegations_from_ids"
                                     [multiple]="true"
+                                    [disableOptionWhenFn]="isDelegationsFromOptionDisabledFn"
+                                    [pipeFn]="delegationsFromSelectablePipeFn"
+                                    [disabled]="!canReceiveDelegations"
                                     [repo]="repo"
                                     [sortService]="sortService"
                                     [subscriptionConfig]="participantSubscriptionConfig"
@@ -133,9 +136,12 @@
                             <mat-form-field class="form100 force-min-with">
                                 <mat-label>{{ 'Voting right delegated to (proxy)' | translate }}</mat-label>
                                 <os-repo-search-selector
-                                    formControlName="vote_delegated_to_id"
-                                    [includeNone]="true"
-                                    [multiple]="false"
+                                    formControlName="vote_delegated_to_ids"
+                                    [includeNone]="false"
+                                    [multiple]="true"
+                                    [disableOptionWhenFn]="isDelegationsToOptionDisabledFn"
+                                    [pipeFn]="delegationsToSelectablePipeFn"
+                                    [disabled]="!canDelegateVote"
                                     [repo]="repo"
                                     [sortService]="sortService"
                                     [subscriptionConfig]="participantSubscriptionConfig"
