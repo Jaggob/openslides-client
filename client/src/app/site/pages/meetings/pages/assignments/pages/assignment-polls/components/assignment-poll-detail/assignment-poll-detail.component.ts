@@ -61,8 +61,8 @@ export class AssignmentPollDetailComponent
         this.pollDialog.open(poll);
     }
 
-    public override getUsersVoteDelegation(user: ViewUser): ViewUser {
-        return super.getUsersVoteDelegation(user) as ViewUser;
+    public override getUsersVoteDelegation(user: ViewUser): ViewUser[] {
+        return super.getUsersVoteDelegation(user) as ViewUser[];
     }
 
     protected createVotesData(): BaseVoteData[] {
@@ -77,6 +77,7 @@ export class AssignmentPollDetailComponent
                 if (!votes[token]) {
                     votes[token] = {
                         user: vote.user,
+                        delegated_user: vote.delegated_user,
                         groupIds: vote.user?.group_ids(),
                         structureLevelIds: vote.user?.structure_level_ids(),
                         votes: []
@@ -104,6 +105,7 @@ export class AssignmentPollDetailComponent
                 // global vote must be the only vote, so we can just ignore any previous value
                 votes[vote.user_token] = {
                     user: vote.user,
+                    delegated_user: vote.delegated_user,
                     votes: [`${this.translate.instant(`General`)}: ${this.voteValueToLabel(vote.value)}`]
                 };
             }

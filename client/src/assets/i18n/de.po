@@ -5832,6 +5832,9 @@ msgstr "Abstimmung beendet/veröffentlicht"
 msgid "Voting successful."
 msgstr "Stimmabgabe erfolgreich."
 
+msgid "Voting successful (voted by {{ user }})."
+msgstr "Stimmabgabe erfolgreich (abgestimmt von {{ user }})."
+
 msgid "Voting type"
 msgstr "Art der Stimmabgabe"
 
@@ -6092,6 +6095,9 @@ msgstr "Sie haben nicht die Berechtigung zur Stimmabgabe."
 
 msgid "You have already voted."
 msgstr "Sie haben bereits Ihre Stimme abgegeben."
+
+msgid "{{ user }} has already voted."
+msgstr "{{ user }} hat bereits abgestimmt."
 
 msgid "You have to be logged in to be able to vote."
 msgstr "Sie müssen sich anmelden um Ihre Stimme abgeben zu können."

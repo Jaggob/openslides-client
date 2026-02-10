@@ -1,6 +1,6 @@
 import { Component, Inject, OnDestroy, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject, map, Observable } from 'rxjs';
 import { Permission } from 'src/app/domain/definitions/permission';
 import { Selectable } from 'src/app/domain/interfaces/selectable';
 import { GENDERS } from 'src/app/domain/models/users/user';
@@ -35,8 +35,34 @@ export class ParticipantListInfoDialogComponent extends BaseUiComponent implemen
         return this._otherParticipantsSubject;
     }
 
+    public get delegationsFromParticipantsObservable(): Observable<ViewMeetingUser[]> {
+        return this._otherParticipantsSubject.pipe(
+            map(participants =>
+                this.canReceiveDelegations
+                    ? participants.filter(user => (user.vote_delegations_from?.length ?? 0) === 0)
+                    : []
+            )
+        );
+    }
+
+    public get delegationsToParticipantsObservable(): Observable<ViewMeetingUser[]> {
+        return this._otherParticipantsSubject;
+    }
+
     public get showVoteDelegations(): boolean {
         return this._voteDelegationEnabled;
+    }
+
+    public get canDelegateVote(): boolean {
+        return (this._currentUser?.vote_delegations_from()?.length ?? 0) === 0;
+    }
+
+    public get canReceiveDelegations(): boolean {
+        const delegatedToIds = this.infoDialog.vote_delegated_to_ids;
+        if (delegatedToIds) {
+            return delegatedToIds.length === 0;
+        }
+        return (this._currentUser?.vote_delegated_to()?.length ?? 0) === 0;
     }
 
     public get canOnlyEditOwnDelegation(): boolean {
@@ -90,13 +116,24 @@ export class ParticipantListInfoDialogComponent extends BaseUiComponent implemen
         super.ngOnDestroy();
     }
 
-    public getDisableOptionFn(vote_delegations: number[]): (value: Selectable) => boolean {
+    public readonly isDelegationsFromOptionDisabledFn = (value: Selectable): boolean => {
         if (this.canOnlyEditOwnDelegation) {
-            return value => {
-                return vote_delegations ? !vote_delegations.some(x => x === value.id) : true;
-            };
-        } else {
-            return _ => false;
+            return this.infoDialog.vote_delegations_from_ids
+                ? !this.infoDialog.vote_delegations_from_ids.some(x => x === value.id)
+                : true;
         }
-    }
+        if (!this.canReceiveDelegations) {
+            return true;
+        }
+        const toIds = this.infoDialog.vote_delegated_to_ids || [];
+        return toIds.includes(value.id);
+    };
+
+    public readonly isDelegationsToOptionDisabledFn = (value: Selectable): boolean => {
+        if (!this.canDelegateVote) {
+            return true;
+        }
+        const fromIds = this.infoDialog.vote_delegations_from_ids || [];
+        return fromIds.includes(value.id);
+    };
 }

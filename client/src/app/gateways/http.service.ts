@@ -105,10 +105,10 @@ export class HttpService {
                     if (typeof cleanError !== `string`) {
                         throw cleanError;
                     }
-                    this.snackBar.open(cleanError, this.translate.instant(`Ok`));
                     if (!catchError) {
                         throw cleanError;
                     }
+                    this.snackBar.open(cleanError, this.translate.instant(`Ok`));
                     return null;
                 } else if (!navigator.onLine) {
                     const cleanError = this.translate.instant(`The request could not be sent. Check your connection.`);

@@ -119,6 +119,43 @@ export class Poll extends BaseDecimalModel<Poll> {
         return this.pollmethod === PollMethod.Y;
     }
 
+    public getVoteActorIdForUser(userId: Id): Id | null {
+        if (!this.live_votes || this.live_votes[userId] === undefined) {
+            return null;
+        }
+
+        const rawVote = this.live_votes[userId];
+        if (rawVote === null || rawVote === undefined) {
+            return null;
+        }
+
+        let payload: any = rawVote;
+        if (typeof rawVote === `string`) {
+            try {
+                payload = JSON.parse(rawVote);
+            } catch {
+                return null;
+            }
+        }
+
+        if (!payload || typeof payload !== `object`) {
+            return null;
+        }
+
+        const requestUser = payload.request_user_id ?? payload.requestUser ?? payload.request_user;
+        const voteUser = payload.vote_user_id ?? payload.voteUser ?? payload.vote_user;
+
+        if (typeof requestUser === `number` && requestUser > 0) {
+            return requestUser;
+        }
+
+        if (typeof voteUser === `number` && voteUser > 0) {
+            return voteUser;
+        }
+
+        return null;
+    }
+
     public get isMethodN(): boolean {
         return this.pollmethod === PollMethod.N;
     }

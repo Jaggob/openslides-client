@@ -246,14 +246,18 @@ export abstract class BasePollDetailComponent<V extends PollContentObject, S ext
 
         for (const entry of this.poll.entitled_users_at_stop || []) {
             userIds.add(entry.user_id);
-            if (entry.vote_delegated_to_user_id) {
-                userIds.add(entry.vote_delegated_to_user_id);
+            if (entry.vote_delegated_to_user_ids?.length) {
+                entry.vote_delegated_to_user_ids.forEach(id => userIds.add(id));
             }
             if (entry.user_merged_into_id) {
                 userIds.add(entry.user_merged_into_id);
             }
-            if (entry.delegation_user_merged_into_id) {
-                userIds.add(entry.delegation_user_merged_into_id);
+            if (entry.delegation_user_merged_into_ids?.length) {
+                entry.delegation_user_merged_into_ids.forEach(id => {
+                    if (id) {
+                        userIds.add(id);
+                    }
+                });
             }
         }
         this.subscriptions.push(
@@ -271,18 +275,33 @@ export abstract class BasePollDetailComponent<V extends PollContentObject, S ext
                             id: entry.user_id,
                             user: users.find(user => user.id === entry.user_id),
                             voted_verbose: `voted:${entry.voted}`,
-                            vote_delegated_to: entry.vote_delegated_to_user_id
-                                ? users.find(user => user.id === entry.vote_delegated_to_user_id)
+                            vote_delegated_to: entry.vote_delegated_to_user_ids?.length
+                                ? entry.vote_delegated_to_user_ids
+                                      .map(id => users.find(user => user.id === id))
+                                      .filter(user => !!user)
+                                : null,
+                            vote_delegated_to_names: entry.vote_delegated_to_user_ids?.length
+                                ? entry.vote_delegated_to_user_ids
+                                      .map(id => users.find(user => user.id === id)?.getShortName())
+                                      .filter(name => !!name)
+                                      .join(`, `)
                                 : null,
                             user_merged_into: entry.user_merged_into_id
                                 ? `${this.translate.instant(`Old account of`)} ${users
                                       .find(user => user.id === entry.user_merged_into_id)
                                       ?.getShortName()}`
                                 : null,
-                            delegation_user_merged_into: entry.delegation_user_merged_into_id
-                                ? `(${this.translate.instant(`represented by old account of`)}) ${users
-                                      .find(user => user.id === entry.delegation_user_merged_into_id)
-                                      ?.getShortName()}`
+                            delegation_user_merged_into: entry.delegation_user_merged_into_ids?.length
+                                ? entry.delegation_user_merged_into_ids
+                                      .map(id =>
+                                          id
+                                              ? `(${this.translate.instant(
+                                                    `represented by old account of`
+                                                )}) ${users.find(user => user.id === id)?.getShortName()}`
+                                              : null
+                                      )
+                                      .filter(text => !!text)
+                                      .join(`, `)
                                 : null
                         });
                     }
@@ -303,8 +322,9 @@ export abstract class BasePollDetailComponent<V extends PollContentObject, S ext
         }
         const delegates = new Set<Id>([]);
         Array.from(userIds).forEach(userId => {
-            if (this.userRepo.getViewModel(userId)?.vote_delegated_to_id()) {
-                delegates.add(this.userRepo.getViewModel(userId)?.vote_delegated_to_id());
+            const delegatedToIds = this.userRepo.getViewModel(userId)?.vote_delegated_to_ids();
+            if (delegatedToIds?.length) {
+                delegatedToIds.forEach(id => delegates.add(id));
             }
         });
         userIds.update(delegates);
@@ -318,7 +338,7 @@ export abstract class BasePollDetailComponent<V extends PollContentObject, S ext
                 .subscribe(users => {
                     const entries: EntitledUsersTableEntry[] = [];
                     for (const user of users || []) {
-                        const delegateToId = user.vote_delegated_to_id();
+                        const delegateToIds = user.vote_delegated_to_ids();
                         const voted = this.poll.live_votes && this.poll.live_votes[user.id] !== undefined;
                         entries.push({
                             id: user.id,
@@ -327,8 +347,16 @@ export abstract class BasePollDetailComponent<V extends PollContentObject, S ext
                             user_id: user.id,
                             present: user?.isPresentInMeeting(),
                             voted: voted,
-                            vote_delegated_to_user_id: delegateToId,
-                            vote_delegated_to: delegateToId ? users.find(utmp => utmp.id === delegateToId) : null
+                            vote_delegated_to_user_ids: delegateToIds,
+                            vote_delegated_to: delegateToIds?.length
+                                ? delegateToIds.map(id => users.find(utmp => utmp.id === id)).filter(u => !!u)
+                                : null,
+                            vote_delegated_to_names: delegateToIds?.length
+                                ? delegateToIds
+                                      .map(id => users.find(utmp => utmp.id === id)?.getShortName())
+                                      .filter(name => !!name)
+                                      .join(`, `)
+                                : null
                         });
                     }
                     this.countVoteAllowedAndPresent = entries.filter(entry => {
@@ -350,16 +378,11 @@ export abstract class BasePollDetailComponent<V extends PollContentObject, S ext
         return false;
     }
 
-    public getUsersVoteDelegation(user: ViewUser): ViewUser | null {
-        if (user.isVoteRightDelegated) {
-            return (
-                user.vote_delegated_to(this.activeMeetingId!) ??
-                this.userRepo.getViewModel(user.vote_delegated_to_id(this.activeMeetingId))
-            );
-        }
-
-        if (this._currentOperator.canVoteFor(user)) {
-            return this._currentOperator;
+    public getUsersVoteDelegation(user: ViewUser): ViewUser[] | null {
+        const actorId = this.poll?.getVoteActorIdForUser?.(user.id) ?? null;
+        if (actorId !== null && actorId !== user.id) {
+            const actorUser = this.userRepo.getViewModel(actorId);
+            return actorUser ? [actorUser] : null;
         }
 
         return null;

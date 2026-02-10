@@ -239,9 +239,9 @@
                                             {{ 'Voting right delegated to (proxy)' | translate }}
                                         </mat-label>
                                         <os-repo-search-selector
-                                            formControlName="vote_delegated_to_id"
-                                            [includeNone]="true"
-                                            [multiple]="false"
+                                            formControlName="vote_delegated_to_ids"
+                                            [includeNone]="false"
+                                            [multiple]="true"
                                             [repo]="repo"
                                             [sortService]="sortService"
                                             [subscriptionConfig]="participantSubscriptionConfig"

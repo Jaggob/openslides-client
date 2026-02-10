@@ -42,7 +42,7 @@ export interface InfoDialog {
     /**
      * Transfer voting rights to
      */
-    vote_delegated_to_id: number;
+    vote_delegated_to_ids: number[];
 }
 
 @Injectable({
