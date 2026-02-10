@@ -43,6 +43,8 @@ export class AssignmentDetailComponent extends BaseMeetingComponent implements O
 
     public readonly hasLoaded = new Deferred<boolean>();
 
+    public candidateApplicationsEnabled = true;
+
     /**
      * Determines if the assignment is new
      */
@@ -183,6 +185,13 @@ export class AssignmentDetailComponent extends BaseMeetingComponent implements O
             agenda_type: [``],
             number_poll_candidates: [false]
         });
+
+        this.updateSubscription(
+            `candidate_applications_enabled`,
+            this.meetingSettingsService
+                .get(`assignments_enable_candidate_applications`)
+                .subscribe(value => (this.candidateApplicationsEnabled = !!value))
+        );
     }
 
     public onIdFound(id: Id | null): void {
@@ -348,8 +357,12 @@ export class AssignmentDetailComponent extends BaseMeetingComponent implements O
      * @param candidate A ViewAssignmentUser currently in the list of related users
      */
     public async removeCandidate(candidate: ViewAssignmentCandidate): Promise<void> {
-        await this.assignmentCandidateRepo.delete(candidate);
-        this.updateCandidatesArray();
+        const name = this.getCandidateName(candidate);
+        const title = this.translate.instant(`Are you sure you want to remove this candidate?`);
+        if (await this.promptService.open(title, name)) {
+            await this.assignmentCandidateRepo.delete(candidate);
+            this.updateCandidatesArray();
+        }
     }
 
     private updateCandidatesArray(): void {
@@ -374,9 +387,19 @@ export class AssignmentDetailComponent extends BaseMeetingComponent implements O
     public async removeSelf(): Promise<void> {
         const candidate = this.assignment.candidates.find(c => c.user_id === this.operator.operatorId);
         if (candidate) {
-            await this.removeCandidate(candidate);
+            const title = this.translate.instant(`Are you sure you want to remove yourself as candidate?`);
+            const name = this.getCandidateName(candidate);
+            if (await this.promptService.open(title, name)) {
+                await this.assignmentCandidateRepo.delete(candidate);
+                this.updateCandidatesArray();
+            }
         }
     }
+
+    public getCandidateName(candidate: ViewAssignmentCandidate | null): string {
+        return candidate?.user?.short_name || candidate?.user?.full_name || candidate?.getTitle() || ``;
+    }
+
 
     /**
      * Triggers an update of the sorting.

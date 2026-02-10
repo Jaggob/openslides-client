@@ -1,0 +1,154 @@
+<os-head-bar
+    [goBack]="!isEditing"
+    [nav]="false"
+    [prevUrl]="assignmentBackUrl"
+    [editMode]="isEditing"
+    [isSaveButtonEnabled]="!form.pristine"
+    [saveAction]="saveApplicationAction"
+    (cancelEditEvent)="navigateToView()"
+>
+    <div class="title-slot">
+        @if (candidate) {
+            <h1 class="mock-h2">
+                @if (assignment) {
+                    <span>{{ assignment.title }}</span>
+                    <span>&nbsp;&middot;&nbsp;</span>
+                }
+                <span>{{ getCandidateName(candidate) }}</span>
+            </h1>
+        }
+    </div>
+    @if (showNavigateButtons) {
+        <div class="extra-controls-slot prev-next-motion-controls">
+            <button
+                class="nav-button-overflow"
+                mat-button
+                [disabled]="!previousCandidate"
+                (click)="navigateToCandidate(previousCandidate)"
+            >
+                <os-icon-container icon="chevron_left">
+                    {{ previousCandidate ? getCandidateName(previousCandidate) : '' }}
+                </os-icon-container>
+            </button>
+            <button
+                class="nav-button-overflow"
+                mat-button
+                [disabled]="!nextCandidate"
+                (click)="navigateToCandidate(nextCandidate)"
+            >
+                <os-icon-container icon="chevron_right" [swap]="true">
+                    {{ nextCandidate ? getCandidateName(nextCandidate) : '' }}
+                </os-icon-container>
+            </button>
+        </div>
+    }
+    @if (assignment) {
+        <ng-container class="menu-slot">
+            <button mat-icon-button type="button" [matMenuTriggerFor]="candidateMenu">
+                <mat-icon>more_vert</mat-icon>
+            </button>
+        </ng-container>
+    }
+</os-head-bar>
+<mat-menu #candidateMenu="matMenu">
+    <os-speaker-button [menuItem]="true" [object]="candidate" />
+    @if (canEdit && !isEditing && candidateApplicationsEnabled) {
+        <button mat-menu-item [routerLink]="['edit']">
+            <mat-icon>edit</mat-icon>
+            <span>{{ 'Edit' | translate }}</span>
+        </button>
+    }
+    <button mat-menu-item (click)="onDownloadPdf()">
+        <mat-icon>picture_as_pdf</mat-icon>
+        <span>{{ 'PDF' | translate }}</span>
+    </button>
+    <mat-divider
+        *osPerms="[
+            permission.projectorCanManage,
+            permission.agendaItemCanManage,
+            permission.meetingCanSeeHistory
+        ]"
+    />
+    <os-projector-button *osPerms="permission.projectorCanManage" [menuItem]="true" [object]="candidate" />
+    <div *osPerms="permission.agendaItemCanManage">
+        @if (!candidate?.agenda_item_id) {
+            <button mat-menu-item (click)="addToAgenda()">
+                <mat-icon>add</mat-icon>
+                <span>{{ 'Add to agenda' | translate }}</span>
+            </button>
+        } @else {
+            <button mat-menu-item (click)="removeFromAgenda()">
+                <mat-icon>remove</mat-icon>
+                <span>{{ 'Remove from agenda' | translate }}</span>
+            </button>
+        }
+    </div>
+    <div *osPerms="permission.meetingCanSeeHistory">
+        <button mat-menu-item (click)="goToHistory()">
+            <mat-icon>history</mat-icon>
+            <span>{{ 'History' | translate }}</span>
+        </button>
+    </div>
+    @if (canEdit) {
+        <mat-divider />
+        <button class="red-warning-text" mat-menu-item (click)="deleteCandidate()">
+            <mat-icon>delete</mat-icon>
+            <span>{{ 'Delete' | translate }}</span>
+        </button>
+    }
+</mat-menu>
+
+@if (!isEditing) {
+    <div class="spacer-bottom-60">
+        <mat-card class="os-card">
+            <mat-card-content>
+                @if (candidateApplicationsEnabled) {
+                    @if (candidate?.application) {
+                        <div class="application" [innerHTML]="candidate.application | trust: 'html'"></div>
+                    } @else {
+                        <div class="application-empty">{{ 'No text submitted' | translate }}</div>
+                    }
+
+                    @if (sortedAttachments.length) {
+                        <div class="content-field">
+                            <div>
+                                <h3>
+                                    {{ 'Attachments' | translate }}
+                                    <mat-icon>attach_file</mat-icon>
+                                </h3>
+                                <mat-list class="election-document-list" dense>
+                                    @for (file of sortedAttachments; track file) {
+                                        <mat-list-item class="attachment-entry">
+                                            <a target="_blank" [routerLink]="file.url">
+                                                <mat-icon class="attachment-icon">{{ file.getIcon() }}</mat-icon>
+                                                {{ file.getTitle() }}
+                                            </a>
+                                        </mat-list-item>
+                                    }
+                                </mat-list>
+                            </div>
+                        </div>
+                    }
+                } @else {
+                    <div class="application-empty">
+                        {{ 'Candidate applications are disabled for this meeting.' | translate }}
+                    </div>
+                }
+            </mat-card-content>
+        </mat-card>
+    </div>
+}
+
+    @if (candidateApplicationsEnabled && canEdit && isEditing) {
+        <mat-card class="os-card spacer-bottom-60">
+            <mat-card-content>
+                <h3>{{ 'Edit application' | translate }}</h3>
+                <form class="content" tabindex="-1" [formGroup]="form">
+                    <os-editor formControlName="application" [allowEmbeds]="true"></os-editor>
+                    <div *osPerms="permission.mediafileCanManage">
+                        <os-attachment-control formControlName="attachment_mediafile_ids"></os-attachment-control>
+                    </div>
+                </form>
+            </mat-card-content>
+        </mat-card>
+    }

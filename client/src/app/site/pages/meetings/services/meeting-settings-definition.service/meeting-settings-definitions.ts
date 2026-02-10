@@ -969,6 +969,17 @@ export const meetingSettings: SettingsGroup[] = fillInSettingsDefaults([
                 ]
             },
             {
+                label: _(`Candidates`),
+                settings: [
+                    {
+                        key: `assignments_enable_candidate_applications`,
+                        label: _(`Enable candidate applications`),
+                        type: `boolean`,
+                        helpText: _(`Allow candidates to add application texts and attachments.`)
+                    }
+                ]
+            },
+            {
                 label: _(`Ballot papers`),
                 settings: [
                     {

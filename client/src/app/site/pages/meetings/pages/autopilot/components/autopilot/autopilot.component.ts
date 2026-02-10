@@ -12,6 +12,7 @@ import { OperatorService } from 'src/app/site/services/operator.service';
 
 import { BaseMeetingComponent } from '../../../../base/base-meeting.component';
 import { ViewListOfSpeakers } from '../../../agenda';
+import { ViewAssignmentCandidate } from '../../../assignments/view-models/view-assignment-candidate';
 import { CurrentListOfSpeakersService } from '../../../agenda/modules/list-of-speakers/services/current-list-of-speakers.service';
 import { ListOfSpeakersControllerService } from '../../../agenda/modules/list-of-speakers/services/list-of-speakers-controller.service';
 import { HasPolls } from '../../../polls';
@@ -30,6 +31,7 @@ export class AutopilotComponent extends BaseMeetingComponent implements OnInit {
     public listOfSpeakers: ViewListOfSpeakers | null = null;
     public projector: ViewProjector | null = null;
     public projectedViewModel: (BaseViewModel & HasProjectorTitle & Partial<HasPolls>) | null = null;
+    public candidateApplicationsEnabled = true;
 
     /**
      * filled by child component
@@ -37,11 +39,13 @@ export class AutopilotComponent extends BaseMeetingComponent implements OnInit {
     public canReaddLastSpeaker = false;
 
     public get title(): string {
-        if (this._currentProjection) {
-            return this._currentProjection.getTitle();
-        } else {
+        if (!this._currentProjection) {
             return ``;
         }
+        if (this.projectedViewModel?.collection === `assignment_candidate`) {
+            return this.getCandidateAutopilotTitle(this.projectedViewModel as ViewAssignmentCandidate);
+        }
+        return this._currentProjection.getTitle();
     }
 
     public get showPollCollection(): boolean {
@@ -65,6 +69,27 @@ export class AutopilotComponent extends BaseMeetingComponent implements OnInit {
     }
 
     public get viewModelUrl(): string {
+        if (this.projectedViewModel?.collection === `assignment_candidate`) {
+            const candidate = this.projectedViewModel as ViewAssignmentCandidate;
+            if (!this.candidateApplicationsEnabled) {
+                if (candidate.assignment?.getDetailStateUrl) {
+                    return candidate.assignment.getDetailStateUrl() || ``;
+                }
+                if (candidate.meeting_id && candidate.assignment?.sequential_number) {
+                    return `/${candidate.meeting_id}/assignments/${candidate.assignment.sequential_number}`;
+                }
+                return ``;
+            }
+            if (candidate.assignment?.getDetailStateUrl) {
+                const baseUrl = candidate.assignment.getDetailStateUrl();
+                if (baseUrl) {
+                    return `${baseUrl}/candidate/${candidate.id}`;
+                }
+            }
+            if (candidate.meeting_id && candidate.assignment?.sequential_number) {
+                return `/${candidate.meeting_id}/assignments/${candidate.assignment.sequential_number}/candidate/${candidate.id}`;
+            }
+        }
         if (this.projectedViewModel && isDetailNavigable(this.projectedViewModel)) {
             return (this.projectedViewModel as DetailNavigable).getDetailStateUrl();
         } else {
@@ -154,6 +179,9 @@ export class AutopilotComponent extends BaseMeetingComponent implements OnInit {
             this.meetingSettingsService
                 .get(`list_of_speakers_default_structure_level_time`)
                 .subscribe(time => (this.structureLevelCountdownEnabled = time > 0)),
+            this.meetingSettingsService
+                .get(`assignments_enable_candidate_applications`)
+                .subscribe(value => (this.candidateApplicationsEnabled = !!value)),
             breakpoint.observe([`(min-width: 1050px)`]).subscribe((state: BreakpointState) => {
                 this.showRightCol.next(state.matches);
             })
@@ -178,5 +206,11 @@ export class AutopilotComponent extends BaseMeetingComponent implements OnInit {
 
     public customizeAutopilot(): void {
         this.dialog.open(AutopilotSettingsComponent);
+    }
+
+    private getCandidateAutopilotTitle(candidate: ViewAssignmentCandidate): string {
+        const candidateName = candidate.user?.short_name || candidate.user?.full_name || candidate.getTitle() || ``;
+        const assignmentTitle = candidate.assignment?.title || ``;
+        return assignmentTitle ? `${assignmentTitle} · ${candidateName}` : candidateName;
     }
 }

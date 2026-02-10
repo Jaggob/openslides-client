@@ -1,0 +1,33 @@
+.prev-next-motion-controls {
+    align-items: center;
+    display: flex;
+    gap: 4px;
+}
+
+.nav-button-overflow {
+    max-width: 200px;
+}
+
+.application {
+    margin-bottom: 16px;
+}
+
+.application-empty {
+    color: #6b6b6b;
+    font-style: italic;
+    margin-bottom: 16px;
+}
+
+.election-document-list mat-list-item {
+    height: auto;
+    height: max-content !important;
+    a {
+        text-wrap: wrap;
+        max-width: 100%;
+        word-break: break-word;
+    }
+}
+
+.attachment-icon {
+    vertical-align: text-bottom;
+}

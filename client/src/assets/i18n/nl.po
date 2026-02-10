@@ -6549,3 +6549,12 @@ msgstr "ingezonden"
 
 msgid "withdrawn"
 msgstr "geschrapt"
+
+msgid "No text submitted"
+msgstr "Geen tekst ingediend"
+
+msgid "Enable candidate applications"
+msgstr "Kandidaatteksten inschakelen"
+
+msgid "Candidate applications are disabled for this meeting."
+msgstr "Kandidaatteksten zijn voor deze vergadering uitgeschakeld."

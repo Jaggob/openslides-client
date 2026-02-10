@@ -6,9 +6,12 @@ import { PollMethod, PollTableData, VotingResult } from 'src/app/domain/models/p
 import { HtmlToPdfService } from 'src/app/gateways/export/html-to-pdf.service';
 import { ViewPoll } from 'src/app/site/pages/meetings/pages/polls';
 
+import { MeetingSettingsService } from 'src/app/site/pages/meetings/services/meeting-settings.service';
+
 import { AssignmentPollService, UnknownUserLabel } from '../modules/assignment-poll/services/assignment-poll.service';
 import { ViewAssignment } from '../view-models';
 import { AssignmentExportServiceModule } from './assignment-export-service.module';
+import { AssignmentCandidatePdfService } from './assignment-candidate-pdf.service';
 
 /**
  * Creates a PDF document from a single assignment
@@ -18,7 +21,9 @@ export class AssignmentPdfService {
     public constructor(
         private translate: TranslateService,
         private htmlToPdfService: HtmlToPdfService,
-        private assignmentPollService: AssignmentPollService
+        private assignmentPollService: AssignmentPollService,
+        private assignmentCandidatePdfService: AssignmentCandidatePdfService,
+        private meetingSettingsService: MeetingSettingsService
     ) {}
 
     /**
@@ -34,8 +39,9 @@ export class AssignmentPdfService {
         const description = this.createDescription(assignment);
         const candidateList = this.createCandidateList(assignment);
         const pollResult = this.createPollResultTable(assignment.polls);
+        const candidateApplications = this.createCandidateApplications(assignment);
 
-        return [title, preamble, description, candidateList, pollResult];
+        return [title, preamble, description, candidateList, pollResult, ...candidateApplications];
     }
 
     /**
@@ -137,6 +143,25 @@ export class AssignmentPdfService {
         } else {
             return [];
         }
+    }
+
+    private createCandidateApplications(assignment: ViewAssignment): Content[] {
+        if (!this.meetingSettingsService.instant(`assignments_enable_candidate_applications`)) {
+            return [];
+        }
+        if (!assignment.candidates?.length) {
+            return [];
+        }
+        const docs: Content[] = [];
+        for (const candidate of assignment.candidates) {
+            const candidateDoc = this.assignmentCandidatePdfService.candidateToDocDef(candidate, assignment);
+            if (candidateDoc.length) {
+                const [first, ...rest] = candidateDoc;
+                docs.push({ ...(first as ContentText), pageBreak: `before` });
+                docs.push(...rest);
+            }
+        }
+        return docs;
     }
 
     /**

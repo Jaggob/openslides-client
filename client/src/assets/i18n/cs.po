@@ -6241,3 +6241,12 @@ msgstr "podáno"
 
 msgid "withdrawn"
 msgstr "stažen"
+
+msgid "No text submitted"
+msgstr "Text nebyl odeslán"
+
+msgid "Enable candidate applications"
+msgstr "Povolit kandidátské texty"
+
+msgid "Candidate applications are disabled for this meeting."
+msgstr "Texty kandidatur jsou pro toto zasedání deaktivovány."

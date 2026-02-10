@@ -6434,3 +6434,12 @@ msgstr "présenté"
 
 msgid "withdrawn"
 msgstr "retiré"
+
+msgid "No text submitted"
+msgstr "Aucun texte soumis"
+
+msgid "Enable candidate applications"
+msgstr "Activer les textes de candidature"
+
+msgid "Candidate applications are disabled for this meeting."
+msgstr "Les textes de candidature sont désactivés pour cette réunion."

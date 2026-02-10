@@ -47,8 +47,22 @@ export const getAssignmentDetailSubscriptionConfig: SubscriptionConfigGenerator 
             { idField: `list_of_speakers_id`, ...listOfSpeakersSpeakerCountSubscription },
             {
                 idField: `candidate_ids`,
-                fieldset: [`weight`],
-                follow: [{ idField: `meeting_user_id`, ...MeetingUserFieldsets.FullNameSubscription }]
+                fieldset: [
+                    `weight`,
+                    `application`,
+                    `attachment_meeting_mediafile_ids`,
+                    `list_of_speakers_id`,
+                    `projection_ids`
+                ],
+                follow: [
+                    { idField: `meeting_user_id`, ...MeetingUserFieldsets.FullNameSubscription },
+                    { idField: `list_of_speakers_id`, ...listOfSpeakersSpeakerCountSubscription },
+                    {
+                        idField: `attachment_meeting_mediafile_ids`,
+                        fieldset: FULL_FIELDSET,
+                        follow: [{ idField: `mediafile_id`, fieldset: FULL_FIELDSET }]
+                    }
+                ]
             }
         ]
     },
