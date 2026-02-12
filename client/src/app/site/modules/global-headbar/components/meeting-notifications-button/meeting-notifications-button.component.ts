@@ -17,6 +17,7 @@ export class MeetingNotificationsButtonComponent {
         this.notificationService.notificationsObservable;
     public readonly unreadCountObservable: Observable<number> = this.notificationService.unreadCountObservable;
     public readonly unreadIdsObservable: Observable<string[]> = this.notificationService.unreadIdsObservable;
+    public readonly readCountObservable: Observable<number> = this.notificationService.readCountObservable;
     public readonly hasActiveMeetingObservable: Observable<boolean> = this.notificationService.hasActiveMeetingObservable;
 
     public constructor(
@@ -26,6 +27,10 @@ export class MeetingNotificationsButtonComponent {
 
     public clearNotifications(): void {
         this.notificationService.clearMeetingNotifications();
+    }
+
+    public clearReadNotifications(): void {
+        this.notificationService.clearReadNotifications();
     }
 
     public markAsRead(notificationId: string): void {

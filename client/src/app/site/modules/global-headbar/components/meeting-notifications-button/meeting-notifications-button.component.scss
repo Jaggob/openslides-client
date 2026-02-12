@@ -59,6 +59,12 @@
     font-weight: 500;
 }
 
+.menu-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
 .notification-item {
     min-height: 46px;
     height: auto;

@@ -19,9 +19,17 @@
     <ng-template matMenuContent>
         <div class="menu-header">
             <div class="menu-title">{{ 'Notifications' | translate }}</div>
-            <button mat-button type="button" (click)="clearNotifications()">
-                {{ 'Clear' | translate }}
-            </button>
+            <div class="menu-actions">
+                @let readCount = readCountObservable | async;
+                @if ((readCount ?? 0) > 0) {
+                    <button mat-button type="button" (click)="$event.stopPropagation(); clearReadNotifications()">
+                        {{ 'Clear read' | translate }}
+                    </button>
+                }
+                <button mat-button type="button" (click)="clearNotifications()">
+                    {{ 'Clear' | translate }}
+                </button>
+            </div>
         </div>
         <mat-divider />
 

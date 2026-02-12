@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { NavigationEnd, Router, UrlTree } from '@angular/router';
 import { BehaviorSubject, filter, Subscription } from 'rxjs';
 import { Id } from 'src/app/domain/definitions/key-types';
+import { Permission } from 'src/app/domain/definitions/permission';
 import { AgendaItemRepositoryService } from 'src/app/gateways/repositories/agenda';
 import { AssignmentCandidateRepositoryService } from 'src/app/gateways/repositories/assignments/assignment-candidate-repository.service/assignment-candidate-repository.service';
 import { MotionRepositoryService } from 'src/app/gateways/repositories/motions/motion-repository.service/motion-repository.service';
@@ -104,6 +105,10 @@ export class MeetingChangeNotificationService {
         return this._unreadIdsSubject;
     }
 
+    public get readCountObservable(): BehaviorSubject<number> {
+        return this._readCountSubject;
+    }
+
     public get hasActiveMeetingObservable(): BehaviorSubject<boolean> {
         return this._hasActiveMeetingSubject;
     }
@@ -111,6 +116,7 @@ export class MeetingChangeNotificationService {
     private readonly _notificationsSubject = new BehaviorSubject<MeetingChangeNotification[]>([]);
     private readonly _unreadCountSubject = new BehaviorSubject<number>(0);
     private readonly _unreadIdsSubject = new BehaviorSubject<string[]>([]);
+    private readonly _readCountSubject = new BehaviorSubject<number>(0);
     private readonly _hasActiveMeetingSubject = new BehaviorSubject<boolean>(false);
     private readonly byMeeting: Record<number, MeetingNotificationState> = {};
     private readonly watchState: MeetingWatchState = {
@@ -137,6 +143,9 @@ export class MeetingChangeNotificationService {
     ) {
         this.storage.addNoClearKey(STORAGE_KEY);
         void this.setup();
+        this.operator.operatorUpdated.subscribe(() => {
+            this.updateSubjects();
+        });
         this.router.events.pipe(filter(event => event instanceof NavigationEnd)).subscribe(() => {
             this.markNotificationsAsReadByCurrentRoute();
         });
@@ -183,6 +192,27 @@ export class MeetingChangeNotificationService {
         void this.saveToStorage();
     }
 
+    public clearReadNotifications(): void {
+        if (!this.activeMeetingId) {
+            return;
+        }
+        const state = this.getMeetingState(this.activeMeetingId);
+        if (!state.notifications.length) {
+            return;
+        }
+        const unreadIds = new Set(state.unreadIds);
+        const nextNotifications = state.notifications.filter(notification => unreadIds.has(notification.id));
+        if (nextNotifications.length === state.notifications.length) {
+            return;
+        }
+        state.notifications = nextNotifications;
+        state.unreadIds = state.unreadIds.filter(unreadId =>
+            state.notifications.some(notification => notification.id === unreadId)
+        );
+        this.updateSubjects();
+        void this.saveToStorage();
+    }
+
     private async setup(): Promise<void> {
         await this.loadFromStorage();
         this.activeMeetingIdService.meetingIdObservable.subscribe(meetingId => {
@@ -220,6 +250,11 @@ export class MeetingChangeNotificationService {
     }
 
     private onMotionsChange(meetingId: Id, motions: ViewMotion[]): void {
+        if (!this.canSeeMotions()) {
+            this.watchState.knownMotionIds = new Set(motions.map(motion => motion.id));
+            this.watchState.motionsInitialized = true;
+            return;
+        }
         if (this.watchState.isBootstrapping) {
             this.watchState.knownMotionIds = new Set(motions.map(motion => motion.id));
             this.watchState.motionsInitialized = true;
@@ -257,6 +292,11 @@ export class MeetingChangeNotificationService {
     }
 
     private onCandidatesChange(meetingId: Id, candidates: ViewAssignmentCandidate[]): void {
+        if (!this.canSeeAssignments()) {
+            this.watchState.knownCandidateIds = new Set(candidates.map(candidate => candidate.id));
+            this.watchState.candidatesInitialized = true;
+            return;
+        }
         if (this.watchState.isBootstrapping) {
             this.watchState.knownCandidateIds = new Set(candidates.map(candidate => candidate.id));
             this.watchState.candidatesInitialized = true;
@@ -318,6 +358,11 @@ export class MeetingChangeNotificationService {
         agendaItems.forEach(item => {
             snapshots.set(item.id, this.createAgendaSnapshot(item));
         });
+        if (!this.canSeeAgenda()) {
+            this.watchState.agendaSnapshots = snapshots;
+            this.watchState.agendaInitialized = true;
+            return;
+        }
 
         if (this.watchState.isBootstrapping) {
             this.watchState.agendaSnapshots = snapshots;
@@ -386,6 +431,9 @@ export class MeetingChangeNotificationService {
         meetingId: Id,
         payload: Omit<MeetingChangeNotification, `id` | `meetingId` | `createdAt`>
     ): void {
+        if (!this.canSeeNotificationType(payload.type)) {
+            return;
+        }
         const meetingState = this.getMeetingState(meetingId);
         const notification: MeetingChangeNotification = {
             id: `${payload.type}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -414,12 +462,17 @@ export class MeetingChangeNotificationService {
             this._notificationsSubject.next([]);
             this._unreadCountSubject.next(0);
             this._unreadIdsSubject.next([]);
+            this._readCountSubject.next(0);
             return;
         }
         const state = this.getMeetingState(this.activeMeetingId);
-        this._notificationsSubject.next(state.notifications);
-        this._unreadCountSubject.next(state.unreadIds.length);
-        this._unreadIdsSubject.next(state.unreadIds);
+        const visibleNotifications = state.notifications.filter(notification => this.canSeeNotificationType(notification.type));
+        const visibleIds = new Set(visibleNotifications.map(notification => notification.id));
+        const visibleUnreadIds = state.unreadIds.filter(id => visibleIds.has(id));
+        this._notificationsSubject.next(visibleNotifications);
+        this._unreadCountSubject.next(visibleUnreadIds.length);
+        this._unreadIdsSubject.next(visibleUnreadIds);
+        this._readCountSubject.next(visibleNotifications.length - visibleUnreadIds.length);
     }
 
     private resetWatchState(): void {
@@ -446,6 +499,33 @@ export class MeetingChangeNotificationService {
     private shouldNotifyAgendaAddition(snapshot: AgendaSnapshotEntry): boolean {
         // If a motion is merely added to agenda, do not notify.
         return !snapshot.contentObjectId?.startsWith(`motion/`);
+    }
+
+    private canSeeMotions(): boolean {
+        return this.operator.hasPerms(Permission.motionCanSee, Permission.motionCanSeeInternal);
+    }
+
+    private canSeeAssignments(): boolean {
+        return this.operator.hasPerms(Permission.assignmentCanSee);
+    }
+
+    private canSeeAgenda(): boolean {
+        return this.operator.hasPerms(Permission.agendaItemCanSee, Permission.agendaItemCanSeeInternal);
+    }
+
+    private canSeeNotificationType(type: MeetingNotificationType): boolean {
+        switch (type) {
+            case `motion`:
+            case `amendment`:
+                return this.canSeeMotions();
+            case `candidate`:
+            case `candidate_self`:
+                return this.canSeeAssignments();
+            case `agenda_added`:
+            case `agenda_updated`:
+            case `agenda_removed`:
+                return this.canSeeAgenda();
+        }
     }
 
     private getAgendaNotificationTarget(
