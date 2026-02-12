@@ -1,0 +1,51 @@
+@if (hasActiveMeetingObservable | async) {
+    <button
+        class="notifications-button"
+        mat-icon-button
+        [matMenuTriggerFor]="notificationMenu"
+        matTooltip="{{ 'Notifications' | translate }}"
+    >
+        <mat-icon>notifications</mat-icon>
+        @let unreadCount = unreadCountObservable | async;
+        @if ((unreadCount ?? 0) > 0) {
+            <span class="notifications-counter" [ngClass]="getUnreadCountClass(unreadCount)">
+                {{ formatUnreadCount(unreadCount) }}
+            </span>
+        }
+    </button>
+}
+
+<mat-menu #notificationMenu="matMenu" class="meeting-notifications-menu">
+    <ng-template matMenuContent>
+        <div class="menu-header">
+            <div class="menu-title">{{ 'Notifications' | translate }}</div>
+            <button mat-button type="button" (click)="clearNotifications()">
+                {{ 'Clear' | translate }}
+            </button>
+        </div>
+        <mat-divider />
+
+        @if ((notificationsObservable | async)?.length) {
+            @let unreadIds = unreadIdsObservable | async;
+            @for (notification of notificationsObservable | async; track notification.id) {
+                <button
+                    mat-menu-item
+                    class="notification-item"
+                    [class.unread]="isUnread(notification.id, unreadIds)"
+                    (click)="openNotification(notification)"
+                >
+                    <mat-icon class="notification-icon">{{ getTypeIcon(notification) }}</mat-icon>
+                    <div class="notification-content">
+                        <div class="notification-title" [matTooltip]="getNotificationLine(notification)">
+                            {{ getNotificationLine(notification) }}
+                        </div>
+                    </div>
+                </button>
+            }
+        } @else {
+            <div class="empty-state">
+                {{ 'No notifications yet' | translate }}
+            </div>
+        }
+    </ng-template>
+</mat-menu>
