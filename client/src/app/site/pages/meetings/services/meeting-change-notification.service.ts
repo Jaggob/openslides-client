@@ -5,14 +5,15 @@ import { Id } from 'src/app/domain/definitions/key-types';
 import { Permission } from 'src/app/domain/definitions/permission';
 import { AgendaItemRepositoryService } from 'src/app/gateways/repositories/agenda';
 import { AssignmentCandidateRepositoryService } from 'src/app/gateways/repositories/assignments/assignment-candidate-repository.service/assignment-candidate-repository.service';
+import { HistoryEntryRepositoryService } from 'src/app/gateways/repositories/history-entry/history-entry-repository.service';
+import { ViewHistoryEntry } from 'src/app/gateways/repositories/history-entry/view-history-entry';
 import { MotionRepositoryService } from 'src/app/gateways/repositories/motions/motion-repository.service/motion-repository.service';
 import { StorageService } from 'src/app/gateways/storage.service';
 import { MeetingUserFieldsets } from 'src/app/domain/fieldsets/user';
 import { getAgendaListMinimalSubscriptionConfig } from 'src/app/site/pages/meetings/pages/agenda/agenda.subscription';
 import { ViewAgendaItem } from 'src/app/site/pages/meetings/pages/agenda';
-import { ViewAssignmentCandidate } from 'src/app/site/pages/meetings/pages/assignments';
 import { getMotionListSubscriptionConfig } from 'src/app/site/pages/meetings/pages/motions/motions.subscription';
-import { ViewMotion } from 'src/app/site/pages/meetings/pages/motions';
+import { ViewMotion } from 'src/app/site/pages/meetings/pages/motions/view-models';
 import { OperatorService } from 'src/app/site/services/operator.service';
 import { ModelRequestService } from 'src/app/site/services/model-request.service';
 import { ViewMeeting } from 'src/app/site/pages/meetings/view-models/view-meeting';
@@ -24,6 +25,13 @@ const MAX_NOTIFICATIONS_PER_MEETING = 100;
 const NOTIFICATION_MOTION_SUBSCRIPTION = `meeting-notifications-motion-list`;
 const NOTIFICATION_ASSIGNMENT_SUBSCRIPTION = `meeting-notifications-assignment-list`;
 const NOTIFICATION_AGENDA_SUBSCRIPTION = `meeting-notifications-agenda-list`;
+const NOTIFICATION_HISTORY_SUBSCRIPTION = `meeting-notifications-history-list`;
+
+const HISTORY_ENTRY_MOTION_CREATED = `Motion created`;
+const HISTORY_ENTRY_CANDIDATE_ADDED = `Candidate added`;
+const HISTORY_ENTRY_AGENDA_ADDED = `Agenda item added`;
+const HISTORY_ENTRY_AGENDA_UPDATED = `Agenda item updated`;
+const HISTORY_ENTRY_AGENDA_REMOVED = `Agenda item removed`;
 
 export type MeetingNotificationType =
     | `motion`
@@ -34,31 +42,19 @@ export type MeetingNotificationType =
     | `agenda_updated`
     | `agenda_removed`;
 
-interface AgendaSnapshotEntry {
-    contentSignature: string;
-    orderSignature: string;
-    title: string;
-    contentObjectId?: string;
-}
-
 interface MeetingNotificationState {
     firstSeenAt?: number;
     notifications: MeetingChangeNotification[];
     unreadIds: string[];
+    dismissedIds?: string[];
+    knownMotionIds?: Id[];
+    knownAssignmentCandidateIds?: Id[];
+    knownAgendaItemIds?: Id[];
+    fallbackSeenAt?: Record<string, number>;
 }
 
 interface PersistedNotificationState {
     byMeeting: Record<number, MeetingNotificationState>;
-}
-
-interface MeetingWatchState {
-    isBootstrapping: boolean;
-    motionsInitialized: boolean;
-    knownMotionIds: Set<Id>;
-    candidatesInitialized: boolean;
-    knownCandidateIds: Set<Id>;
-    agendaInitialized: boolean;
-    agendaSnapshots: Map<Id, AgendaSnapshotEntry>;
 }
 
 export interface MeetingChangeNotification {
@@ -119,15 +115,7 @@ export class MeetingChangeNotificationService {
     private readonly _readCountSubject = new BehaviorSubject<number>(0);
     private readonly _hasActiveMeetingSubject = new BehaviorSubject<boolean>(false);
     private readonly byMeeting: Record<number, MeetingNotificationState> = {};
-    private readonly watchState: MeetingWatchState = {
-        isBootstrapping: false,
-        motionsInitialized: false,
-        knownMotionIds: new Set<Id>(),
-        candidatesInitialized: false,
-        knownCandidateIds: new Set<Id>(),
-        agendaInitialized: false,
-        agendaSnapshots: new Map<Id, AgendaSnapshotEntry>()
-    };
+    private readonly meetingDataReady: Record<number, boolean> = {};
     private meetingSubscriptions = new Subscription();
     private activeMeetingId: Id | null = null;
 
@@ -139,12 +127,17 @@ export class MeetingChangeNotificationService {
         private operator: OperatorService,
         private motionRepo: MotionRepositoryService,
         private agendaItemRepo: AgendaItemRepositoryService,
-        private assignmentCandidateRepo: AssignmentCandidateRepositoryService
+        private assignmentCandidateRepo: AssignmentCandidateRepositoryService,
+        private historyEntryRepo: HistoryEntryRepositoryService
     ) {
         this.storage.addNoClearKey(STORAGE_KEY);
         void this.setup();
         this.operator.operatorUpdated.subscribe(() => {
-            this.updateSubjects();
+            if (this.activeMeetingId) {
+                this.rebuildNotificationsFromServer(this.activeMeetingId);
+            } else {
+                this.updateSubjects();
+            }
         });
         this.router.events.pipe(filter(event => event instanceof NavigationEnd)).subscribe(() => {
             this.markNotificationsAsReadByCurrentRoute();
@@ -182,11 +175,11 @@ export class MeetingChangeNotificationService {
         if (!this.activeMeetingId) {
             return;
         }
-        const previousFirstSeenAt = this.getMeetingState(this.activeMeetingId).firstSeenAt;
         this.byMeeting[this.activeMeetingId] = {
-            firstSeenAt: previousFirstSeenAt,
+            firstSeenAt: Date.now(),
             notifications: [],
-            unreadIds: []
+            unreadIds: [],
+            dismissedIds: []
         };
         this.updateSubjects();
         void this.saveToStorage();
@@ -201,14 +194,20 @@ export class MeetingChangeNotificationService {
             return;
         }
         const unreadIds = new Set(state.unreadIds);
-        const nextNotifications = state.notifications.filter(notification => unreadIds.has(notification.id));
-        if (nextNotifications.length === state.notifications.length) {
+        const removedReadIds = state.notifications
+            .filter(notification => !unreadIds.has(notification.id))
+            .map(notification => notification.id);
+        if (!removedReadIds.length) {
             return;
         }
-        state.notifications = nextNotifications;
-        state.unreadIds = state.unreadIds.filter(unreadId =>
-            state.notifications.some(notification => notification.id === unreadId)
-        );
+
+        const dismissedIds = new Set(state.dismissedIds || []);
+        removedReadIds.forEach(id => dismissedIds.add(id));
+
+        state.dismissedIds = Array.from(dismissedIds);
+        state.notifications = state.notifications.filter(notification => unreadIds.has(notification.id));
+        state.unreadIds = state.unreadIds.filter(id => state.notifications.some(notification => notification.id === id));
+
         this.updateSubjects();
         void this.saveToStorage();
     }
@@ -221,239 +220,563 @@ export class MeetingChangeNotificationService {
             this.meetingSubscriptions.unsubscribe();
             this.meetingSubscriptions = new Subscription();
             this.closeModelSubscriptions();
-            this.resetWatchState();
             this.updateSubjects();
             if (!meetingId) {
                 return;
             }
+            this.meetingDataReady[meetingId] = false;
+
             const meetingState = this.getMeetingState(meetingId);
             if (!meetingState.firstSeenAt) {
                 meetingState.firstSeenAt = Date.now();
                 void this.saveToStorage();
             }
-            void this.startModelSubscriptions(meetingId);
-            this.meetingSubscriptions.add(
-                this.motionRepo.getViewModelListObservable().subscribe(motions => this.onMotionsChange(meetingId, motions))
-            );
-            this.meetingSubscriptions.add(
-                this.assignmentCandidateRepo
-                    .getViewModelListObservable()
-                    .subscribe(candidates => this.onCandidatesChange(meetingId, candidates))
-            );
-            this.meetingSubscriptions.add(
-                this.agendaItemRepo
-                    .getViewModelListObservable()
-                    .subscribe(agendaItems => this.onAgendaItemsChange(meetingId, agendaItems))
-            );
-            this.markNotificationsAsReadByCurrentRoute();
-        });
-    }
 
-    private onMotionsChange(meetingId: Id, motions: ViewMotion[]): void {
-        if (!this.canSeeMotions()) {
-            this.watchState.knownMotionIds = new Set(motions.map(motion => motion.id));
-            this.watchState.motionsInitialized = true;
-            return;
-        }
-        if (this.watchState.isBootstrapping) {
-            this.watchState.knownMotionIds = new Set(motions.map(motion => motion.id));
-            this.watchState.motionsInitialized = true;
-            return;
-        }
-        const currentIds = new Set(motions.map(motion => motion.id));
-        if (!this.watchState.motionsInitialized) {
-            this.watchState.knownMotionIds = currentIds;
-            this.watchState.motionsInitialized = true;
-            return;
-        }
-
-        motions.forEach(motion => {
-            if (this.watchState.knownMotionIds.has(motion.id)) {
-                return;
-            }
-            if (this.isOwnMotion(motion)) {
-                return;
-            }
-            const isAmendment = !!motion.lead_motion_id;
-            this.addNotification(meetingId, {
-                type: isAmendment ? `amendment` : `motion`,
-                title: motion.title || motion.number || `#${motion.sequential_number}`,
-                subtitle: isAmendment ? `Motions / Amendments` : `Motions`,
-                route: [`/`, `${meetingId}`, `motions`, `${motion.sequential_number}`],
-                templateKey: isAmendment ? `notification.motion.amendment_created` : `notification.motion.created`,
-                templateParams: { motionNumber: motion.sequential_number },
-                entityType: `motion`,
-                entityId: motion.id,
-                groupKey: `motion:${motion.id}`
-            });
-        });
-
-        this.watchState.knownMotionIds = currentIds;
-    }
-
-    private onCandidatesChange(meetingId: Id, candidates: ViewAssignmentCandidate[]): void {
-        if (!this.canSeeAssignments()) {
-            this.watchState.knownCandidateIds = new Set(candidates.map(candidate => candidate.id));
-            this.watchState.candidatesInitialized = true;
-            return;
-        }
-        if (this.watchState.isBootstrapping) {
-            this.watchState.knownCandidateIds = new Set(candidates.map(candidate => candidate.id));
-            this.watchState.candidatesInitialized = true;
-            return;
-        }
-        const currentIds = new Set(candidates.map(candidate => candidate.id));
-        if (!this.watchState.candidatesInitialized) {
-            this.watchState.knownCandidateIds = currentIds;
-            this.watchState.candidatesInitialized = true;
-            return;
-        }
-
-        candidates.forEach(candidate => {
-            if (this.watchState.knownCandidateIds.has(candidate.id)) {
-                return;
-            }
-            const operatorId = this.operator.operatorId;
-            if (!!operatorId && candidate.user_id === operatorId) {
-                const assignmentNumber = candidate.assignment?.sequential_number;
-                this.addNotification(meetingId, {
-                    type: `candidate_self`,
-                    title: `You were added as candidate`,
-                    subtitle: candidate.assignment?.title,
-                    route: assignmentNumber
-                        ? [`/`, `${meetingId}`, `assignments`, `${assignmentNumber}`]
-                        : [`/`, `${meetingId}`, `assignments`],
-                    templateKey: `notification.assignment.candidate_self_added`,
-                    templateParams: { assignmentNumber: assignmentNumber || 0 },
-                    entityType: `assignment_candidate`,
-                    entityId: candidate.id,
-                    groupKey: `assignment_candidate:${candidate.id}`
-                });
-                return;
-            }
-            if (!this.shouldNotifyCandidateAddition(candidate)) {
-                return;
-            }
-            const assignmentNumber = candidate.assignment?.sequential_number;
-            this.addNotification(meetingId, {
-                type: `candidate`,
-                title: candidate.user?.short_name || `New candidate`,
-                subtitle: candidate.assignment?.title,
-                route: assignmentNumber
-                    ? [`/`, `${meetingId}`, `assignments`, `${assignmentNumber}`]
-                    : [`/`, `${meetingId}`, `assignments`],
-                templateKey: `notification.assignment.candidate_added`,
-                templateParams: { assignmentNumber: assignmentNumber || 0 },
-                entityType: `assignment_candidate`,
-                entityId: candidate.id,
-                groupKey: `assignment_candidate:${candidate.id}`
-            });
-        });
-
-        this.watchState.knownCandidateIds = currentIds;
-    }
-
-    private onAgendaItemsChange(meetingId: Id, agendaItems: ViewAgendaItem[]): void {
-        const snapshots = new Map<Id, AgendaSnapshotEntry>();
-        agendaItems.forEach(item => {
-            snapshots.set(item.id, this.createAgendaSnapshot(item));
-        });
-        if (!this.canSeeAgenda()) {
-            this.watchState.agendaSnapshots = snapshots;
-            this.watchState.agendaInitialized = true;
-            return;
-        }
-
-        if (this.watchState.isBootstrapping) {
-            this.watchState.agendaSnapshots = snapshots;
-            this.watchState.agendaInitialized = true;
-            return;
-        }
-
-        if (!this.watchState.agendaInitialized) {
-            this.watchState.agendaSnapshots = snapshots;
-            this.watchState.agendaInitialized = true;
-            return;
-        }
-
-        snapshots.forEach((snapshot, id) => {
-            const previousSnapshot = this.watchState.agendaSnapshots.get(id);
-            if (!previousSnapshot) {
-                if (!this.shouldNotifyAgendaAddition(snapshot)) {
-                    return;
+            void this.startModelSubscriptions(meetingId).then(() => {
+                if (this.activeMeetingId === meetingId) {
+                    this.meetingDataReady[meetingId] = true;
+                    this.rebuildNotificationsFromServer(meetingId);
                 }
-                this.addNotification(meetingId, {
-                    type: `agenda_added`,
-                    title: snapshot.title,
-                    ...this.getAgendaNotificationTarget(meetingId, id, snapshot),
-                    templateKey: `notification.agenda.item_added`,
-                    templateParams: { agendaItemId: id },
-                    entityType: this.getAgendaEntityType(snapshot),
-                    entityId: this.getAgendaEntityId(id, snapshot),
-                    groupKey: `agenda_item:${id}`
-                });
-                return;
-            }
-            if (previousSnapshot.contentSignature !== snapshot.contentSignature) {
-                this.addNotification(meetingId, {
-                    type: `agenda_updated`,
-                    title: snapshot.title,
-                    ...this.getAgendaNotificationTarget(meetingId, id, snapshot),
-                    templateKey: `notification.agenda.item_updated`,
-                    templateParams: { agendaItemId: id },
-                    entityType: this.getAgendaEntityType(snapshot),
-                    entityId: this.getAgendaEntityId(id, snapshot),
-                    groupKey: `agenda_item:${id}`
-                });
-            }
-        });
-
-        this.watchState.agendaSnapshots.forEach((snapshot, id) => {
-            if (snapshots.has(id)) {
-                return;
-            }
-            this.addNotification(meetingId, {
-                type: `agenda_removed`,
-                title: snapshot.title,
-                route: [`/`, `${meetingId}`, `agenda`],
-                templateKey: `notification.agenda.item_removed`,
-                templateParams: { agendaItemId: id },
-                entityType: this.getAgendaEntityType(snapshot),
-                entityId: this.getAgendaEntityId(id, snapshot),
-                groupKey: `agenda_item:${id}`
             });
+            this.meetingSubscriptions.add(
+                this.historyEntryRepo.getViewModelListObservable().subscribe(() => {
+                    if (this.meetingDataReady[meetingId]) {
+                        this.rebuildNotificationsFromServer(meetingId);
+                    }
+                })
+            );
+            this.meetingSubscriptions.add(
+                this.motionRepo.getViewModelListObservable().subscribe(() => {
+                    if (this.meetingDataReady[meetingId]) {
+                        this.rebuildNotificationsFromServer(meetingId);
+                    }
+                })
+            );
+            this.meetingSubscriptions.add(
+                this.assignmentCandidateRepo.getViewModelListObservable().subscribe(() => {
+                    if (this.meetingDataReady[meetingId]) {
+                        this.rebuildNotificationsFromServer(meetingId);
+                    }
+                })
+            );
+            this.meetingSubscriptions.add(
+                this.agendaItemRepo.getViewModelListObservable().subscribe(() => {
+                    if (this.meetingDataReady[meetingId]) {
+                        this.rebuildNotificationsFromServer(meetingId);
+                    }
+                })
+            );
         });
-
-        this.watchState.agendaSnapshots = snapshots;
     }
 
-    private addNotification(
-        meetingId: Id,
-        payload: Omit<MeetingChangeNotification, `id` | `meetingId` | `createdAt`>
-    ): void {
-        if (!this.canSeeNotificationType(payload.type)) {
+    private rebuildNotificationsFromServer(meetingId: Id): void {
+        if (this.activeMeetingId !== meetingId) {
             return;
         }
-        const meetingState = this.getMeetingState(meetingId);
-        const notification: MeetingChangeNotification = {
-            id: `${payload.type}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+
+        const state = this.getMeetingState(meetingId);
+        const fallbackStateBefore = JSON.stringify({
+            knownMotionIds: state.knownMotionIds,
+            knownAssignmentCandidateIds: state.knownAssignmentCandidateIds,
+            knownAgendaItemIds: state.knownAgendaItemIds,
+            fallbackSeenAt: state.fallbackSeenAt
+        });
+        const previousNotifications = state.notifications;
+        const nextNotifications = this.buildNotificationsFromHistory(
             meetingId,
-            createdAt: Date.now(),
-            ...payload
-        };
-        meetingState.notifications = [notification, ...meetingState.notifications].slice(0, MAX_NOTIFICATIONS_PER_MEETING);
-        meetingState.unreadIds = [notification.id, ...meetingState.unreadIds].slice(0, MAX_NOTIFICATIONS_PER_MEETING);
+            state,
+            state.firstSeenAt || 0,
+            new Set(state.dismissedIds || [])
+        );
+        const fallbackStateAfter = JSON.stringify({
+            knownMotionIds: state.knownMotionIds,
+            knownAssignmentCandidateIds: state.knownAssignmentCandidateIds,
+            knownAgendaItemIds: state.knownAgendaItemIds,
+            fallbackSeenAt: state.fallbackSeenAt
+        });
+        const fallbackStateChanged = fallbackStateBefore !== fallbackStateAfter;
+
+        const previousIds = new Set(previousNotifications.map(notification => notification.id));
+        const nextIds = new Set(nextNotifications.map(notification => notification.id));
+        const newIds = nextNotifications
+            .filter(notification => !previousIds.has(notification.id))
+            .map(notification => notification.id);
+
+        const unreadIds: string[] = [];
+        const seenUnreadIds = new Set<string>();
+        [...newIds, ...state.unreadIds.filter(id => nextIds.has(id))].forEach(id => {
+            if (!seenUnreadIds.has(id)) {
+                seenUnreadIds.add(id);
+                unreadIds.push(id);
+            }
+        });
+
+        const notificationsChanged = !this.sameNotificationLists(previousNotifications, nextNotifications);
+        const unreadChanged = !this.sameStringArrays(state.unreadIds, unreadIds);
+
+        if (!notificationsChanged && !unreadChanged) {
+            this.markNotificationsAsReadByCurrentRoute();
+            if (fallbackStateChanged) {
+                void this.saveToStorage();
+            }
+            return;
+        }
+
+        state.notifications = nextNotifications;
+        state.unreadIds = unreadIds;
+
+        this.markNotificationsAsReadByCurrentRoute();
         this.updateSubjects();
         void this.saveToStorage();
+    }
+
+    private buildNotificationsFromHistory(
+        meetingId: Id,
+        state: MeetingNotificationState,
+        firstSeenAt: number,
+        dismissedIds: Set<string>
+    ): MeetingChangeNotification[] {
+        const historyEntries = this.historyEntryRepo
+            .getViewModelList()
+            .filter(entry => entry.meeting_id === meetingId)
+            .sort((a, b) => (b.position?.timestamp || 0) - (a.position?.timestamp || 0));
+
+        const notifications = historyEntries
+            .map(entry => this.createNotificationFromHistoryEntry(meetingId, entry))
+            .filter((entry): entry is MeetingChangeNotification => !!entry)
+            .filter(notification => notification.createdAt >= firstSeenAt)
+            .filter(notification => !dismissedIds.has(notification.id));
+
+        if (notifications.length > 0) {
+            return notifications.slice(0, MAX_NOTIFICATIONS_PER_MEETING);
+        }
+
+        // Fallback for users without access to history entries.
+        const fallbackNotifications = this.buildFallbackNotifications(
+            meetingId,
+            state,
+            firstSeenAt,
+            dismissedIds
+        );
+        return fallbackNotifications.slice(0, MAX_NOTIFICATIONS_PER_MEETING);
+    }
+
+    private buildFallbackNotifications(
+        meetingId: Id,
+        state: MeetingNotificationState,
+        firstSeenAt: number,
+        dismissedIds: Set<string>
+    ): MeetingChangeNotification[] {
+        state.knownMotionIds ??= [];
+        state.knownAssignmentCandidateIds ??= [];
+        state.knownAgendaItemIds ??= [];
+        state.fallbackSeenAt ??= {};
+
+        const currentMotionIds = this.motionRepo
+            .getViewModelList()
+            .filter(motion => motion.meeting_id === meetingId)
+            .map(motion => motion.id);
+        const currentCandidateIds = this.assignmentCandidateRepo
+            .getViewModelList()
+            .filter(candidate => candidate.meeting_id === meetingId)
+            .map(candidate => candidate.id);
+        const currentAgendaIds = this.agendaItemRepo
+            .getViewModelList()
+            .filter(item => item.meeting_id === meetingId)
+            .map(item => item.id);
+
+        const hasBaseline =
+            state.knownMotionIds.length > 0 ||
+            state.knownAssignmentCandidateIds.length > 0 ||
+            state.knownAgendaItemIds.length > 0;
+        if (!hasBaseline) {
+            state.knownMotionIds = [...new Set(currentMotionIds)];
+            state.knownAssignmentCandidateIds = [...new Set(currentCandidateIds)];
+            state.knownAgendaItemIds = [...new Set(currentAgendaIds)];
+            return [];
+        }
+
+        this.captureNewFallbackEntitySeenAt(
+            `motion`,
+            currentMotionIds,
+            state.knownMotionIds,
+            state.fallbackSeenAt
+        );
+        this.captureNewFallbackEntitySeenAt(
+            `assignment_candidate`,
+            currentCandidateIds,
+            state.knownAssignmentCandidateIds,
+            state.fallbackSeenAt
+        );
+        this.captureNewFallbackEntitySeenAt(
+            `agenda_item`,
+            currentAgendaIds,
+            state.knownAgendaItemIds,
+            state.fallbackSeenAt
+        );
+
+        const motionNotifications = this.canSeeMotions()
+            ? this.motionRepo
+                  .getViewModelList()
+                  .filter(motion => motion.meeting_id === meetingId)
+                  .map(motion =>
+                      this.createFallbackMotionNotification(meetingId, motion, state.fallbackSeenAt || {})
+                  )
+                  .filter((notification): notification is MeetingChangeNotification => !!notification)
+            : [];
+
+        const candidateNotifications = this.canSeeAssignments()
+            ? this.assignmentCandidateRepo
+                  .getViewModelList()
+                  .filter(candidate => candidate.meeting_id === meetingId)
+                  .map(candidate =>
+                      this.createFallbackCandidateNotification(meetingId, candidate.id, state.fallbackSeenAt || {})
+                  )
+                  .filter((notification): notification is MeetingChangeNotification => !!notification)
+            : [];
+
+        const agendaNotifications = this.canSeeAgenda()
+            ? this.agendaItemRepo
+                  .getViewModelList()
+                  .filter(item => item.meeting_id === meetingId)
+                  .map(item =>
+                      this.createFallbackAgendaAddedNotification(meetingId, item.id, state.fallbackSeenAt || {})
+                  )
+                  .filter((notification): notification is MeetingChangeNotification => !!notification)
+            : [];
+
+        return [...motionNotifications, ...candidateNotifications, ...agendaNotifications]
+            .filter(notification => notification.createdAt >= firstSeenAt)
+            .filter(notification => !dismissedIds.has(notification.id))
+            .sort((a, b) => b.createdAt - a.createdAt);
+    }
+
+    private captureNewFallbackEntitySeenAt(
+        entityType: `motion` | `assignment_candidate` | `agenda_item`,
+        currentIds: Id[],
+        knownIds: Id[],
+        fallbackSeenAt: Record<string, number>
+    ): void {
+        const known = new Set(knownIds);
+        currentIds.forEach(id => {
+            if (!known.has(id)) {
+                known.add(id);
+                fallbackSeenAt[`${entityType}:${id}`] = Date.now();
+            }
+        });
+        knownIds.length = 0;
+        known.forEach(id => knownIds.push(id));
+    }
+
+    private createFallbackMotionNotification(
+        meetingId: Id,
+        motion: ViewMotion,
+        fallbackSeenAt: Record<string, number>
+    ): MeetingChangeNotification | undefined {
+        const createdAt = fallbackSeenAt[`motion:${motion.id}`] || 0;
+        if (!createdAt || this.isOwnMotionBySubmitter(motion)) {
+            return undefined;
+        }
+
+        const isAmendment = !!motion.lead_motion_id;
+        return {
+            id: this.getMotionNotificationId(motion.id),
+            meetingId,
+            createdAt,
+            type: isAmendment ? `amendment` : `motion`,
+            title: motion.title || motion.number || `#${motion.sequential_number || motion.id}`,
+            subtitle: isAmendment ? `Motions / Amendments` : `Motions`,
+            route: motion.sequential_number
+                ? [`/`, `${meetingId}`, `motions`, `${motion.sequential_number}`]
+                : [`/`, `${meetingId}`, `motions`],
+            templateKey: isAmendment ? `notification.motion.amendment_created` : `notification.motion.created`,
+            templateParams: { motionId: motion.id },
+            entityType: `motion`,
+            entityId: motion.id,
+            groupKey: `motion:${motion.id}`
+        };
+    }
+
+    private createFallbackCandidateNotification(
+        meetingId: Id,
+        candidateId: Id,
+        fallbackSeenAt: Record<string, number>
+    ): MeetingChangeNotification | undefined {
+        const createdAt = fallbackSeenAt[`assignment_candidate:${candidateId}`] || 0;
+        if (!createdAt) {
+            return undefined;
+        }
+        return this.createCandidateNotification(meetingId, candidateId, candidateId, createdAt);
+    }
+
+    private createFallbackAgendaAddedNotification(
+        meetingId: Id,
+        agendaItemId: Id,
+        fallbackSeenAt: Record<string, number>
+    ): MeetingChangeNotification | undefined {
+        const createdAt = fallbackSeenAt[`agenda_item:${agendaItemId}`] || 0;
+        if (!createdAt) {
+            return undefined;
+        }
+        return this.createAgendaNotification(meetingId, agendaItemId, `agenda_added`, agendaItemId, createdAt);
+    }
+
+    private isOwnMotionBySubmitter(motion: ViewMotion): boolean {
+        const operatorId = this.operator.operatorId;
+        if (!operatorId || !motion.submitters?.length) {
+            return false;
+        }
+
+        return motion.submitters.some(
+            submitter =>
+                submitter.meeting_user?.user_id === operatorId || submitter.meeting_user?.user?.id === operatorId
+        );
+    }
+
+    private createNotificationFromHistoryEntry(
+        meetingId: Id,
+        historyEntry: ViewHistoryEntry
+    ): MeetingChangeNotification | undefined {
+        const createdAt = (historyEntry.position?.timestamp || 0) * 1000;
+        if (!createdAt) {
+            return undefined;
+        }
+
+        const entryTitle = historyEntry.entries?.[0] || ``;
+        const modelFqid = historyEntry.model_id || historyEntry.original_model_id;
+        const modelFqidParts = modelFqid?.split(`/`) || [];
+        const modelCollection = modelFqidParts[0] || ``;
+        const modelId = Number(modelFqidParts[1]);
+        if (!modelCollection || !modelId) {
+            return undefined;
+        }
+
+        const actorUserId = historyEntry.position?.original_user_id;
+
+        switch (entryTitle) {
+            case HISTORY_ENTRY_MOTION_CREATED:
+                if (modelCollection !== `motion`) {
+                    return undefined;
+                }
+                return this.createMotionNotification(meetingId, historyEntry.id, modelId, createdAt, actorUserId);
+            case HISTORY_ENTRY_CANDIDATE_ADDED:
+                if (modelCollection !== `assignment_candidate`) {
+                    return undefined;
+                }
+                return this.createCandidateNotification(meetingId, historyEntry.id, modelId, createdAt, actorUserId);
+            case HISTORY_ENTRY_AGENDA_ADDED:
+                if (modelCollection !== `agenda_item`) {
+                    return undefined;
+                }
+                return this.createAgendaNotification(
+                    meetingId,
+                    historyEntry.id,
+                    `agenda_added`,
+                    modelId,
+                    createdAt,
+                    actorUserId
+                );
+            case HISTORY_ENTRY_AGENDA_UPDATED:
+                if (modelCollection !== `agenda_item`) {
+                    return undefined;
+                }
+                return this.createAgendaNotification(
+                    meetingId,
+                    historyEntry.id,
+                    `agenda_updated`,
+                    modelId,
+                    createdAt,
+                    actorUserId
+                );
+            case HISTORY_ENTRY_AGENDA_REMOVED:
+                if (modelCollection !== `agenda_item`) {
+                    return undefined;
+                }
+                return this.createAgendaNotification(
+                    meetingId,
+                    historyEntry.id,
+                    `agenda_removed`,
+                    modelId,
+                    createdAt,
+                    actorUserId
+                );
+            default:
+                return undefined;
+        }
+    }
+
+    private createMotionNotification(
+        meetingId: Id,
+        historyEntryId: Id,
+        motionId: Id,
+        createdAt: number,
+        actorUserId?: number
+    ): MeetingChangeNotification | undefined {
+        if (!this.canSeeMotions() || this.isOwnActor(actorUserId)) {
+            return undefined;
+        }
+
+        const motion = this.motionRepo.getViewModel(motionId);
+        const isAmendment = !!motion?.lead_motion_id;
+
+        return {
+            id: this.getMotionNotificationId(motionId),
+            meetingId,
+            createdAt,
+            type: isAmendment ? `amendment` : `motion`,
+            title: motion?.title || motion?.number || `#${motion?.sequential_number || motionId}`,
+            subtitle: isAmendment ? `Motions / Amendments` : `Motions`,
+            route: motion?.sequential_number
+                ? [`/`, `${meetingId}`, `motions`, `${motion.sequential_number}`]
+                : [`/`, `${meetingId}`, `motions`],
+            templateKey: isAmendment ? `notification.motion.amendment_created` : `notification.motion.created`,
+            templateParams: { motionId },
+            entityType: `motion`,
+            entityId: motionId,
+            groupKey: `motion:${motionId}`
+        };
+    }
+
+    private createCandidateNotification(
+        meetingId: Id,
+        historyEntryId: Id,
+        candidateId: Id,
+        createdAt: number,
+        actorUserId?: number
+    ): MeetingChangeNotification | undefined {
+        if (!this.canSeeAssignments()) {
+            return undefined;
+        }
+
+        const candidate = this.assignmentCandidateRepo.getViewModel(candidateId);
+        if (!candidate || this.isOwnActor(actorUserId)) {
+            return undefined;
+        }
+
+        const operatorId = this.operator.operatorId;
+        const assignmentNumber = candidate.assignment?.sequential_number;
+        const isSelfCandidate = !!operatorId && candidate.user_id === operatorId;
+
+        return {
+            id: this.getCandidateNotificationId(candidateId),
+            meetingId,
+            createdAt,
+            type: isSelfCandidate ? `candidate_self` : `candidate`,
+            title: isSelfCandidate ? `You were added as candidate` : candidate.user?.short_name || `New candidate`,
+            subtitle: candidate.assignment?.title,
+            route: assignmentNumber
+                ? [`/`, `${meetingId}`, `assignments`, `${assignmentNumber}`]
+                : [`/`, `${meetingId}`, `assignments`],
+            templateKey: isSelfCandidate
+                ? `notification.assignment.candidate_self_added`
+                : `notification.assignment.candidate_added`,
+            templateParams: { assignmentId: candidate.assignment_id },
+            entityType: `assignment_candidate`,
+            entityId: candidate.id,
+            groupKey: `assignment_candidate:${candidate.id}`
+        };
+    }
+
+    private createAgendaNotification(
+        meetingId: Id,
+        historyEntryId: Id,
+        type: `agenda_added` | `agenda_updated` | `agenda_removed`,
+        agendaItemId: Id,
+        createdAt: number,
+        actorUserId?: number
+    ): MeetingChangeNotification | undefined {
+        if (!this.canSeeAgenda() || this.isOwnActor(actorUserId)) {
+            return undefined;
+        }
+
+        const agendaItem = this.agendaItemRepo.getViewModel(agendaItemId);
+        if (type === `agenda_added` && agendaItem?.content_object_id?.startsWith(`motion/`)) {
+            return undefined;
+        }
+
+        const { route, queryParams } = this.getAgendaNotificationTarget(meetingId, agendaItemId, agendaItem);
+
+        return {
+            id: this.getAgendaNotificationId(type, agendaItemId),
+            meetingId,
+            createdAt,
+            type,
+            title: agendaItem ? this.agendaItemRepo.getTitle(agendaItem) : `Agenda item`,
+            route,
+            queryParams,
+            templateKey:
+                type === `agenda_added`
+                    ? `notification.agenda.item_added`
+                    : type === `agenda_updated`
+                      ? `notification.agenda.item_updated`
+                      : `notification.agenda.item_removed`,
+            templateParams: { agendaItemId },
+            entityType: agendaItem?.content_object_id?.startsWith(`topic/`) ? `topic` : `agenda_item`,
+            entityId: agendaItemId,
+            groupKey: `agenda_item:${agendaItemId}`
+        };
+    }
+
+    private getAgendaNotificationTarget(
+        meetingId: Id,
+        agendaItemId: Id,
+        agendaItem?: ViewAgendaItem
+    ): Pick<MeetingChangeNotification, `route` | `queryParams`> {
+        const topicPrefix = `topic/`;
+        if (agendaItem?.content_object_id?.startsWith(topicPrefix)) {
+            const topicId = agendaItem.content_object_id.slice(topicPrefix.length);
+            if (topicId) {
+                return {
+                    route: [`/`, `${meetingId}`, `agenda`, `topics`, topicId]
+                };
+            }
+        }
+
+        return {
+            route: [`/`, `${meetingId}`, `agenda`],
+            queryParams: { 'agenda-items': agendaItemId }
+        };
+    }
+
+    private isOwnActor(actorUserId?: number): boolean {
+        const operatorId = this.operator.operatorId;
+        if (!operatorId || !actorUserId || actorUserId <= 0) {
+            return false;
+        }
+        return operatorId === actorUserId;
+    }
+
+    private getMotionNotificationId(motionId: Id): string {
+        return `motion-${motionId}`;
+    }
+
+    private getCandidateNotificationId(candidateId: Id): string {
+        return `assignment-candidate-${candidateId}`;
+    }
+
+    private getAgendaNotificationId(type: `agenda_added` | `agenda_updated` | `agenda_removed`, agendaItemId: Id): string {
+        return `agenda-${type}-${agendaItemId}`;
     }
 
     private getMeetingState(meetingId: Id): MeetingNotificationState {
         if (!this.byMeeting[meetingId]) {
             this.byMeeting[meetingId] = {
                 notifications: [],
-                unreadIds: []
+                unreadIds: [],
+                dismissedIds: [],
+                knownMotionIds: [],
+                knownAssignmentCandidateIds: [],
+                knownAgendaItemIds: [],
+                fallbackSeenAt: {}
             };
         }
+        if (!this.byMeeting[meetingId].dismissedIds) {
+            this.byMeeting[meetingId].dismissedIds = [];
+        }
+        this.byMeeting[meetingId].knownMotionIds ??= [];
+        this.byMeeting[meetingId].knownAssignmentCandidateIds ??= [];
+        this.byMeeting[meetingId].knownAgendaItemIds ??= [];
+        this.byMeeting[meetingId].fallbackSeenAt ??= {};
         return this.byMeeting[meetingId];
     }
 
@@ -475,94 +798,6 @@ export class MeetingChangeNotificationService {
         this._readCountSubject.next(visibleNotifications.length - visibleUnreadIds.length);
     }
 
-    private resetWatchState(): void {
-        this.watchState.isBootstrapping = false;
-        this.watchState.motionsInitialized = false;
-        this.watchState.knownMotionIds = new Set<Id>();
-        this.watchState.candidatesInitialized = false;
-        this.watchState.knownCandidateIds = new Set<Id>();
-        this.watchState.agendaInitialized = false;
-        this.watchState.agendaSnapshots = new Map<Id, AgendaSnapshotEntry>();
-    }
-
-    private createAgendaSnapshot(item: ViewAgendaItem): AgendaSnapshotEntry {
-        return {
-            title: this.agendaItemRepo.getTitle(item),
-            contentObjectId: item.content_object_id,
-            // Fields that mean "content changed".
-            contentSignature: [item.closed, item.type, item.duration, item.comment, item.content_object_id].join(`|`),
-            // Fields that mean order/position changed.
-            orderSignature: [item.item_number, item.parent_id, item.weight].join(`|`)
-        };
-    }
-
-    private shouldNotifyAgendaAddition(snapshot: AgendaSnapshotEntry): boolean {
-        // If a motion is merely added to agenda, do not notify.
-        return !snapshot.contentObjectId?.startsWith(`motion/`);
-    }
-
-    private canSeeMotions(): boolean {
-        return this.operator.hasPerms(Permission.motionCanSee, Permission.motionCanSeeInternal);
-    }
-
-    private canSeeAssignments(): boolean {
-        return this.operator.hasPerms(Permission.assignmentCanSee);
-    }
-
-    private canSeeAgenda(): boolean {
-        return this.operator.hasPerms(Permission.agendaItemCanSee, Permission.agendaItemCanSeeInternal);
-    }
-
-    private canSeeNotificationType(type: MeetingNotificationType): boolean {
-        switch (type) {
-            case `motion`:
-            case `amendment`:
-                return this.canSeeMotions();
-            case `candidate`:
-            case `candidate_self`:
-                return this.canSeeAssignments();
-            case `agenda_added`:
-            case `agenda_updated`:
-            case `agenda_removed`:
-                return this.canSeeAgenda();
-        }
-    }
-
-    private getAgendaNotificationTarget(
-        meetingId: Id,
-        agendaItemId: Id,
-        snapshot: AgendaSnapshotEntry
-    ): Pick<MeetingChangeNotification, `route` | `queryParams`> {
-        const topicPrefix = `topic/`;
-        if (snapshot.contentObjectId?.startsWith(topicPrefix)) {
-            const topicId = snapshot.contentObjectId.slice(topicPrefix.length);
-            if (topicId) {
-                return {
-                    route: [`/`, `${meetingId}`, `agenda`, `topics`, topicId]
-                };
-            }
-        }
-        return {
-            route: [`/`, `${meetingId}`, `agenda`],
-            queryParams: { 'agenda-items': agendaItemId }
-        };
-    }
-
-    private getAgendaEntityType(snapshot: AgendaSnapshotEntry): `agenda_item` | `topic` {
-        return snapshot.contentObjectId?.startsWith(`topic/`) ? `topic` : `agenda_item`;
-    }
-
-    private getAgendaEntityId(agendaItemId: Id, snapshot: AgendaSnapshotEntry): Id {
-        const topicPrefix = `topic/`;
-        if (snapshot.contentObjectId?.startsWith(topicPrefix)) {
-            const topicId = Number(snapshot.contentObjectId.slice(topicPrefix.length));
-            if (!!topicId) {
-                return topicId;
-            }
-        }
-        return agendaItemId;
-    }
-
     private async loadFromStorage(): Promise<void> {
         const state = await this.storage.get<PersistedNotificationState>(STORAGE_KEY);
         if (!isMeetingNotificationState(state)) {
@@ -580,10 +815,18 @@ export class MeetingChangeNotificationService {
             const unreadIds = (meetingState.unreadIds || []).filter(unreadId =>
                 notifications.some(notification => notification.id === unreadId)
             );
+            const dismissedIds = (meetingState.dismissedIds || []).filter(dismissedId =>
+                notifications.some(notification => notification.id === dismissedId)
+            );
             this.byMeeting[meetingId] = {
                 firstSeenAt: meetingState.firstSeenAt,
                 notifications,
-                unreadIds
+                unreadIds,
+                dismissedIds,
+                knownMotionIds: [...(meetingState.knownMotionIds || [])],
+                knownAssignmentCandidateIds: [...(meetingState.knownAssignmentCandidateIds || [])],
+                knownAgendaItemIds: [...(meetingState.knownAgendaItemIds || [])],
+                fallbackSeenAt: { ...(meetingState.fallbackSeenAt || {}) }
             };
         });
     }
@@ -593,7 +836,6 @@ export class MeetingChangeNotificationService {
     }
 
     private async startModelSubscriptions(meetingId: Id): Promise<void> {
-        this.watchState.isBootstrapping = true;
         const motionConfig = {
             ...getMotionListSubscriptionConfig(meetingId),
             subscriptionName: NOTIFICATION_MOTION_SUBSCRIPTION
@@ -622,66 +864,81 @@ export class MeetingChangeNotificationService {
             ...getAgendaListMinimalSubscriptionConfig(meetingId),
             subscriptionName: NOTIFICATION_AGENDA_SUBSCRIPTION
         };
-        try {
-            await Promise.allSettled([
-                this.modelRequestService.subscribeTo(motionConfig),
-                this.modelRequestService.subscribeTo(assignmentConfig),
-                this.modelRequestService.subscribeTo(agendaConfig)
-            ]);
-            await Promise.allSettled([
-                this.modelRequestService.waitSubscriptionReady(NOTIFICATION_MOTION_SUBSCRIPTION, 6000),
-                this.modelRequestService.waitSubscriptionReady(NOTIFICATION_ASSIGNMENT_SUBSCRIPTION, 6000),
-                this.modelRequestService.waitSubscriptionReady(NOTIFICATION_AGENDA_SUBSCRIPTION, 6000)
-            ]);
-        } finally {
-            if (this.activeMeetingId !== meetingId) {
-                return;
-            }
-            this.initializeBaselinesFromCurrentData();
-            this.watchState.isBootstrapping = false;
-        }
-    }
-
-    private initializeBaselinesFromCurrentData(): void {
-        this.watchState.knownMotionIds = new Set(this.motionRepo.getViewModelList().map(motion => motion.id));
-        this.watchState.motionsInitialized = true;
-
-        this.watchState.knownCandidateIds = new Set(
-            this.assignmentCandidateRepo.getViewModelList().map(candidate => candidate.id)
-        );
-        this.watchState.candidatesInitialized = true;
-
-        const snapshots = new Map<Id, AgendaSnapshotEntry>();
-        this.agendaItemRepo.getViewModelList().forEach(item => {
-            snapshots.set(item.id, this.createAgendaSnapshot(item));
-        });
-        this.watchState.agendaSnapshots = snapshots;
-        this.watchState.agendaInitialized = true;
+        const historyConfig = {
+            modelRequest: {
+                viewModelCtor: ViewMeeting,
+                ids: [meetingId],
+                follow: [
+                    {
+                        idField: `relevant_history_entry_ids`,
+                        fieldset: [`id`, `entries`, `meeting_id`, `model_id`, `original_model_id`, `position_id`],
+                        follow: [
+                            {
+                                idField: `position_id`,
+                                fieldset: [`id`, `timestamp`, `original_user_id`]
+                            }
+                        ]
+                    }
+                ]
+            },
+            subscriptionName: NOTIFICATION_HISTORY_SUBSCRIPTION
+        };
+        await Promise.allSettled([
+            this.modelRequestService.subscribeTo(motionConfig),
+            this.modelRequestService.subscribeTo(assignmentConfig),
+            this.modelRequestService.subscribeTo(agendaConfig),
+            this.modelRequestService.subscribeTo(historyConfig)
+        ]);
+        await Promise.allSettled([
+            this.modelRequestService.waitSubscriptionReady(NOTIFICATION_MOTION_SUBSCRIPTION, 6000),
+            this.modelRequestService.waitSubscriptionReady(NOTIFICATION_ASSIGNMENT_SUBSCRIPTION, 6000),
+            this.modelRequestService.waitSubscriptionReady(NOTIFICATION_AGENDA_SUBSCRIPTION, 6000),
+            this.modelRequestService.waitSubscriptionReady(NOTIFICATION_HISTORY_SUBSCRIPTION, 6000)
+        ]);
     }
 
     private closeModelSubscriptions(): void {
         this.modelRequestService.closeSubscription(NOTIFICATION_MOTION_SUBSCRIPTION);
         this.modelRequestService.closeSubscription(NOTIFICATION_ASSIGNMENT_SUBSCRIPTION);
         this.modelRequestService.closeSubscription(NOTIFICATION_AGENDA_SUBSCRIPTION);
+        this.modelRequestService.closeSubscription(NOTIFICATION_HISTORY_SUBSCRIPTION);
     }
 
-    private isOwnMotion(motion: ViewMotion): boolean {
-        const operatorId = this.operator.operatorId;
-        if (!operatorId) {
-            return false;
-        }
-        return (
-            !!motion.submitters?.some(submitter => submitter.user_id === operatorId) ||
-            motion.submittersAsUsers.some(user => user?.id === operatorId)
+    private canSeeMotions(): boolean {
+        return this.operator.hasPerms(
+            Permission.motionCanSee,
+            Permission.motionCanSeeInternal,
+            Permission.motionCanCreate,
+            Permission.motionCanCreateAmendments,
+            Permission.motionCanSupport
         );
     }
 
-    private shouldNotifyCandidateAddition(candidate: ViewAssignmentCandidate): boolean {
-        const operatorId = this.operator.operatorId;
-        if (!operatorId) {
-            return true;
+    private canSeeAssignments(): boolean {
+        return this.operator.hasPerms(
+            Permission.assignmentCanSee,
+            Permission.assignmentCanNominateSelf,
+            Permission.assignmentCanNominateOther
+        );
+    }
+
+    private canSeeAgenda(): boolean {
+        return this.operator.hasPerms(Permission.agendaItemCanSee, Permission.agendaItemCanSeeInternal);
+    }
+
+    private canSeeNotificationType(type: MeetingNotificationType): boolean {
+        switch (type) {
+            case `motion`:
+            case `amendment`:
+                return this.canSeeMotions();
+            case `candidate`:
+            case `candidate_self`:
+                return this.canSeeAssignments();
+            case `agenda_added`:
+            case `agenda_updated`:
+            case `agenda_removed`:
+                return this.canSeeAgenda();
         }
-        return candidate.user_id !== operatorId;
     }
 
     private markNotificationsAsReadByCurrentRoute(): void {
@@ -761,7 +1018,7 @@ export class MeetingChangeNotificationService {
                 ) {
                     return true;
                 }
-                // Backward-compatibility for already persisted older notifications.
+                // Backward-compatibility for older notifications with list query params.
                 if (urlTree.queryParamMap.getAll(`agenda-items`).includes(`${notification.queryParams?.[`agenda-items`]}`)) {
                     return true;
                 }
@@ -769,5 +1026,31 @@ export class MeetingChangeNotificationService {
             case `agenda_removed`:
                 return false;
         }
+    }
+
+    private sameStringArrays(left: string[], right: string[]): boolean {
+        if (left.length !== right.length) {
+            return false;
+        }
+        return left.every((value, index) => value === right[index]);
+    }
+
+    private sameNotificationLists(
+        left: MeetingChangeNotification[],
+        right: MeetingChangeNotification[]
+    ): boolean {
+        if (left.length !== right.length) {
+            return false;
+        }
+        return left.every((entry, index) => {
+            const other = right[index];
+            return (
+                entry.id === other.id &&
+                entry.type === other.type &&
+                entry.title === other.title &&
+                entry.subtitle === other.subtitle &&
+                entry.createdAt === other.createdAt
+            );
+        });
     }
 }

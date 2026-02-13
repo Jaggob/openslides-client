@@ -1180,7 +1180,7 @@ export const RELATIONS: Relation[] = [
     }),
     ...makeGenericO2M({
         OViewModel: ViewHistoryEntry,
-        MPossibleViewModels: [ViewMotion, ViewAssignment, ViewUser],
+        MPossibleViewModels: [ViewMotion, ViewAssignment, ViewAssignmentCandidate, ViewAgendaItem, ViewUser],
         OViewModelField: `model`,
         MPossibleViewModelsField: `history_entries`,
         MPossibleViewModelsIdField: `history_entry_ids`
