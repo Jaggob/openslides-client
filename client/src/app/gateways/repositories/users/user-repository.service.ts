@@ -246,7 +246,9 @@ export class UserRepositoryService extends BaseRepository<ViewUser, User> {
             email: update.email,
             username: update.username,
             pronoun: update.pronoun,
-            gender_id: update.gender_id
+            gender_id: update.gender_id,
+            meeting_id: (update as any).meeting_id,
+            notification_state: (update as any).notification_state
         };
         return this.sendActionToBackend(UserAction.UPDATE_SELF, payload);
     }

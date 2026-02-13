@@ -37,7 +37,7 @@ export class MeetingUserRepositoryService extends BaseMeetingRelatedRepository<V
             `locked_out`
         ]);
 
-        const detailFields: TypedFieldset<MeetingUser> = [`about_me`, `user_id`, `meeting_id`];
+        const detailFields: TypedFieldset<MeetingUser> = [`about_me`, `notification_state`, `user_id`, `meeting_id`];
 
         return {
             [DEFAULT_FIELDSET]: detailFields,
@@ -55,6 +55,7 @@ export class MeetingUserRepositoryService extends BaseMeetingRelatedRepository<V
                 about_me: partialUser.about_me,
                 vote_weight: toDecimal(partialUser.vote_weight, false) as any,
                 comment: partialUser.comment,
+                notification_state: partialUser.notification_state as any,
                 vote_delegated_to_id: partialUser.vote_delegated_to_id,
                 vote_delegations_from_ids: partialUser.vote_delegations_from_ids,
                 structure_level_ids: partialUser.structure_level_ids,

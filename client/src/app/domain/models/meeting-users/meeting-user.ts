@@ -10,6 +10,15 @@ export class MeetingUser extends BaseDecimalModel<MeetingUser> {
     public readonly comment!: string;
     public readonly number!: string;
     public readonly about_me!: string;
+    public readonly notification_state!: {
+        firstSeenAt?: number;
+        unreadIds?: string[];
+        dismissedIds?: string[];
+        knownMotionIds?: Id[];
+        knownAssignmentCandidateIds?: Id[];
+        knownAgendaItemIds?: Id[];
+        fallbackSeenAt?: Record<string, number>;
+    };
     public readonly vote_weight!: number;
     public readonly locked_out!: boolean;
 
@@ -42,6 +51,7 @@ export class MeetingUser extends BaseDecimalModel<MeetingUser> {
         `comment`,
         `number`,
         `about_me`,
+        `notification_state`,
         `vote_weight`,
         `locked_out`,
         `user_id`,

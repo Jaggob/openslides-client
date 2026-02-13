@@ -7,15 +7,19 @@ import { AgendaItemRepositoryService } from 'src/app/gateways/repositories/agend
 import { AssignmentCandidateRepositoryService } from 'src/app/gateways/repositories/assignments/assignment-candidate-repository.service/assignment-candidate-repository.service';
 import { HistoryEntryRepositoryService } from 'src/app/gateways/repositories/history-entry/history-entry-repository.service';
 import { ViewHistoryEntry } from 'src/app/gateways/repositories/history-entry/view-history-entry';
+import { MeetingUserRepositoryService } from 'src/app/gateways/repositories/meeting_user';
 import { MotionRepositoryService } from 'src/app/gateways/repositories/motions/motion-repository.service/motion-repository.service';
 import { StorageService } from 'src/app/gateways/storage.service';
+import { UserRepositoryService } from 'src/app/gateways/repositories/users';
 import { MeetingUserFieldsets } from 'src/app/domain/fieldsets/user';
 import { getAgendaListMinimalSubscriptionConfig } from 'src/app/site/pages/meetings/pages/agenda/agenda.subscription';
 import { ViewAgendaItem } from 'src/app/site/pages/meetings/pages/agenda';
 import { getMotionListSubscriptionConfig } from 'src/app/site/pages/meetings/pages/motions/motions.subscription';
 import { ViewMotion } from 'src/app/site/pages/meetings/pages/motions/view-models';
 import { OperatorService } from 'src/app/site/services/operator.service';
+import { ModelData } from 'src/app/site/services/autoupdate/utils';
 import { ModelRequestService } from 'src/app/site/services/model-request.service';
+import { ViewMeetingUser } from 'src/app/site/pages/meetings/view-models/view-meeting-user';
 import { ViewMeeting } from 'src/app/site/pages/meetings/view-models/view-meeting';
 
 import { ActiveMeetingIdService } from './active-meeting-id.service';
@@ -26,6 +30,7 @@ const NOTIFICATION_MOTION_SUBSCRIPTION = `meeting-notifications-motion-list`;
 const NOTIFICATION_ASSIGNMENT_SUBSCRIPTION = `meeting-notifications-assignment-list`;
 const NOTIFICATION_AGENDA_SUBSCRIPTION = `meeting-notifications-agenda-list`;
 const NOTIFICATION_HISTORY_SUBSCRIPTION = `meeting-notifications-history-list`;
+const NOTIFICATION_STATE_SUBSCRIPTION = `meeting-notifications-state`;
 
 const HISTORY_ENTRY_MOTION_CREATED = `Motion created`;
 const HISTORY_ENTRY_CANDIDATE_ADDED = `Candidate added`;
@@ -116,8 +121,15 @@ export class MeetingChangeNotificationService {
     private readonly _hasActiveMeetingSubject = new BehaviorSubject<boolean>(false);
     private readonly byMeeting: Record<number, MeetingNotificationState> = {};
     private readonly meetingDataReady: Record<number, boolean> = {};
+    private readonly meetingServerStateLoaded: Record<number, boolean> = {};
+    private readonly meetingServerStateHash: Record<number, string> = {};
+    private readonly meetingLastSyncedStateHash: Record<number, string> = {};
+    private readonly meetingPendingServerSync: Record<number, boolean> = {};
+    private readonly stateSubscriptionMeetingUserId: Record<number, Id | null> = {};
     private meetingSubscriptions = new Subscription();
     private activeMeetingId: Id | null = null;
+    private syncToServerTimeout: ReturnType<typeof setTimeout> | null = null;
+    private syncToServerForce = false;
 
     public constructor(
         private storage: StorageService,
@@ -125,6 +137,8 @@ export class MeetingChangeNotificationService {
         private activeMeetingIdService: ActiveMeetingIdService,
         private modelRequestService: ModelRequestService,
         private operator: OperatorService,
+        private userRepo: UserRepositoryService,
+        private meetingUserRepo: MeetingUserRepositoryService,
         private motionRepo: MotionRepositoryService,
         private agendaItemRepo: AgendaItemRepositoryService,
         private assignmentCandidateRepo: AssignmentCandidateRepositoryService,
@@ -154,7 +168,7 @@ export class MeetingChangeNotificationService {
         }
         state.unreadIds = [];
         this.updateSubjects();
-        void this.saveToStorage();
+        void this.saveToStorage(true);
     }
 
     public markAsRead(notificationId: string): void {
@@ -168,7 +182,7 @@ export class MeetingChangeNotificationService {
         }
         state.unreadIds = nextUnreadIds;
         this.updateSubjects();
-        void this.saveToStorage();
+        void this.saveToStorage(true);
     }
 
     public clearMeetingNotifications(): void {
@@ -182,7 +196,7 @@ export class MeetingChangeNotificationService {
             dismissedIds: []
         };
         this.updateSubjects();
-        void this.saveToStorage();
+        void this.saveToStorage(true);
     }
 
     public clearReadNotifications(): void {
@@ -209,7 +223,7 @@ export class MeetingChangeNotificationService {
         state.unreadIds = state.unreadIds.filter(id => state.notifications.some(notification => notification.id === id));
 
         this.updateSubjects();
-        void this.saveToStorage();
+        void this.saveToStorage(true);
     }
 
     private async setup(): Promise<void> {
@@ -225,8 +239,14 @@ export class MeetingChangeNotificationService {
                 return;
             }
             this.meetingDataReady[meetingId] = false;
+            this.meetingServerStateLoaded[meetingId] = false;
+            this.meetingServerStateHash[meetingId] = ``;
+            this.meetingLastSyncedStateHash[meetingId] = ``;
+            this.meetingPendingServerSync[meetingId] = false;
+            this.stateSubscriptionMeetingUserId[meetingId] = null;
 
             const meetingState = this.getMeetingState(meetingId);
+            this.tryLoadMeetingStateFromServer(meetingId);
             if (!meetingState.firstSeenAt) {
                 meetingState.firstSeenAt = Date.now();
                 void this.saveToStorage();
@@ -266,7 +286,115 @@ export class MeetingChangeNotificationService {
                     }
                 })
             );
+            this.meetingSubscriptions.add(
+                this.meetingUserRepo.getViewModelListObservable().subscribe(() => {
+                    this.ensureStateSubscriptionForMeeting(meetingId);
+                    this.tryLoadMeetingStateFromServer(meetingId, true);
+                })
+            );
+            this.meetingSubscriptions.add(
+                this.meetingUserRepo.getModifiedIdsObservable().subscribe(modifiedIds => {
+                    const operatorId = this.operator.operatorId;
+                    if (!operatorId) {
+                        return;
+                    }
+                    const meetingUserId = this.meetingUserRepo.getMeetingUserId(operatorId, meetingId);
+                    if (!meetingUserId || !modifiedIds.includes(meetingUserId)) {
+                        return;
+                    }
+                    this.ensureStateSubscriptionForMeeting(meetingId);
+                    this.tryLoadMeetingStateFromServer(meetingId, true);
+                })
+            );
         });
+    }
+
+    private tryLoadMeetingStateFromServer(meetingId: Id, force = false): void {
+        if (!force && this.meetingServerStateLoaded[meetingId]) {
+            return;
+        }
+
+        const operatorId = this.operator.operatorId;
+        if (!operatorId) {
+            return;
+        }
+        const meetingUserId = this.meetingUserRepo.getMeetingUserId(operatorId, meetingId);
+        if (!meetingUserId) {
+            return;
+        }
+        const meetingUser = this.meetingUserRepo.getViewModel(meetingUserId);
+        if (!meetingUser) {
+            return;
+        }
+
+        this.applyRemoteState(meetingId, meetingUser.notification_state, force);
+    }
+
+    private applyRemoteState(meetingId: Id, remoteState: any, force: boolean): void {
+        const operatorId = this.operator.operatorId;
+        const meetingUserId = operatorId ? this.meetingUserRepo.getMeetingUserId(operatorId, meetingId) : null;
+        const remoteStateHash = JSON.stringify(remoteState ?? null);
+        const remoteStateChanged = this.meetingServerStateHash[meetingId] !== remoteStateHash;
+        if (force && !remoteStateChanged) {
+            this.meetingServerStateLoaded[meetingId] = true;
+            return;
+        }
+        this.meetingServerStateHash[meetingId] = remoteStateHash;
+        this.meetingLastSyncedStateHash[meetingId] = remoteStateHash;
+
+        let stateChanged = false;
+        if (remoteState && typeof remoteState === `object`) {
+            const state = this.getMeetingState(meetingId);
+            const notificationState = remoteState as Partial<MeetingNotificationState>;
+            const nextFirstSeenAt = notificationState.firstSeenAt || state.firstSeenAt;
+            const nextUnreadIds = Array.isArray(notificationState.unreadIds)
+                ? [...notificationState.unreadIds]
+                : [...state.unreadIds];
+            const nextDismissedIds = Array.isArray(notificationState.dismissedIds)
+                ? [...notificationState.dismissedIds]
+                : [...(state.dismissedIds || [])];
+            const nextKnownMotionIds = Array.isArray(notificationState.knownMotionIds)
+                ? [...notificationState.knownMotionIds]
+                : [...(state.knownMotionIds || [])];
+            const nextKnownAssignmentCandidateIds = Array.isArray(notificationState.knownAssignmentCandidateIds)
+                ? [...notificationState.knownAssignmentCandidateIds]
+                : [...(state.knownAssignmentCandidateIds || [])];
+            const nextKnownAgendaItemIds = Array.isArray(notificationState.knownAgendaItemIds)
+                ? [...notificationState.knownAgendaItemIds]
+                : [...(state.knownAgendaItemIds || [])];
+            const nextFallbackSeenAt =
+                notificationState.fallbackSeenAt && typeof notificationState.fallbackSeenAt === `object`
+                    ? { ...notificationState.fallbackSeenAt }
+                    : { ...(state.fallbackSeenAt || {}) };
+
+            stateChanged =
+                state.firstSeenAt !== nextFirstSeenAt ||
+                !this.sameStringArrays(state.unreadIds, nextUnreadIds) ||
+                !this.sameStringArrays(state.dismissedIds || [], nextDismissedIds) ||
+                !this.sameIdArrays(state.knownMotionIds || [], nextKnownMotionIds) ||
+                !this.sameIdArrays(state.knownAssignmentCandidateIds || [], nextKnownAssignmentCandidateIds) ||
+                !this.sameIdArrays(state.knownAgendaItemIds || [], nextKnownAgendaItemIds) ||
+                JSON.stringify(state.fallbackSeenAt || {}) !== JSON.stringify(nextFallbackSeenAt);
+
+            state.firstSeenAt = nextFirstSeenAt;
+            state.unreadIds = nextUnreadIds;
+            state.dismissedIds = nextDismissedIds;
+            state.knownMotionIds = nextKnownMotionIds;
+            state.knownAssignmentCandidateIds = nextKnownAssignmentCandidateIds;
+            state.knownAgendaItemIds = nextKnownAgendaItemIds;
+            state.fallbackSeenAt = nextFallbackSeenAt;
+        }
+
+        this.meetingServerStateLoaded[meetingId] = true;
+        if (this.meetingPendingServerSync[meetingId]) {
+            this.meetingPendingServerSync[meetingId] = false;
+            void this.syncActiveMeetingStateToServer();
+        }
+        if (remoteStateChanged && this.meetingDataReady[meetingId]) {
+            this.rebuildNotificationsFromServer(meetingId);
+        } else if (stateChanged || remoteStateChanged) {
+            this.updateSubjects();
+        }
     }
 
     private rebuildNotificationsFromServer(meetingId: Id): void {
@@ -316,6 +444,7 @@ export class MeetingChangeNotificationService {
 
         if (!notificationsChanged && !unreadChanged) {
             this.markNotificationsAsReadByCurrentRoute();
+            this.updateSubjects();
             if (fallbackStateChanged) {
                 void this.saveToStorage();
             }
@@ -831,8 +960,64 @@ export class MeetingChangeNotificationService {
         });
     }
 
-    private async saveToStorage(): Promise<void> {
+    private async saveToStorage(forceServerSync = false): Promise<void> {
         await this.storage.set(STORAGE_KEY, { byMeeting: this.byMeeting });
+        this.scheduleServerSync(forceServerSync);
+    }
+
+    private scheduleServerSync(forceServerSync = false): void {
+        if (this.syncToServerTimeout) {
+            clearTimeout(this.syncToServerTimeout);
+        }
+        this.syncToServerForce = this.syncToServerForce || forceServerSync;
+        this.syncToServerTimeout = setTimeout(() => {
+            const forceSync = this.syncToServerForce;
+            this.syncToServerForce = false;
+            void this.syncActiveMeetingStateToServer(forceSync);
+        }, 200);
+    }
+
+    private async syncActiveMeetingStateToServer(forceSync = false): Promise<void> {
+        const meetingId = this.activeMeetingId;
+        if (!meetingId || !this.operator.isAuthenticated) {
+            return;
+        }
+        if (!this.meetingServerStateLoaded[meetingId] && !forceSync) {
+            this.meetingPendingServerSync[meetingId] = true;
+            return;
+        }
+
+        const state = this.getMeetingState(meetingId);
+        const payload = {
+            firstSeenAt: state.firstSeenAt,
+            unreadIds: state.unreadIds,
+            dismissedIds: state.dismissedIds || [],
+            knownMotionIds: state.knownMotionIds || [],
+            knownAssignmentCandidateIds: state.knownAssignmentCandidateIds || [],
+            knownAgendaItemIds: state.knownAgendaItemIds || [],
+            fallbackSeenAt: state.fallbackSeenAt || {}
+        };
+        const payloadHash = JSON.stringify(payload);
+        if (
+            payloadHash === this.meetingServerStateHash[meetingId] ||
+            payloadHash === this.meetingLastSyncedStateHash[meetingId]
+        ) {
+            return;
+        }
+
+        try {
+            await this.userRepo.updateSelf(
+                {
+                    meeting_id: meetingId,
+                    notification_state: payload
+                } as any,
+                this.operator.user
+            );
+            this.meetingLastSyncedStateHash[meetingId] = payloadHash;
+        } catch (e) {
+            // keep local state as fallback if server sync fails temporarily
+            return;
+        }
     }
 
     private async startModelSubscriptions(meetingId: Id): Promise<void> {
@@ -883,18 +1068,26 @@ export class MeetingChangeNotificationService {
             },
             subscriptionName: NOTIFICATION_HISTORY_SUBSCRIPTION
         };
-        await Promise.allSettled([
+        const stateConfig = this.getStateSubscriptionConfig(meetingId);
+
+        const subscribeCalls = [
             this.modelRequestService.subscribeTo(motionConfig),
             this.modelRequestService.subscribeTo(assignmentConfig),
             this.modelRequestService.subscribeTo(agendaConfig),
             this.modelRequestService.subscribeTo(historyConfig)
-        ]);
-        await Promise.allSettled([
+        ];
+        subscribeCalls.push(this.modelRequestService.subscribeTo(stateConfig));
+        await Promise.allSettled(subscribeCalls);
+
+        const readyCalls = [
             this.modelRequestService.waitSubscriptionReady(NOTIFICATION_MOTION_SUBSCRIPTION, 6000),
             this.modelRequestService.waitSubscriptionReady(NOTIFICATION_ASSIGNMENT_SUBSCRIPTION, 6000),
             this.modelRequestService.waitSubscriptionReady(NOTIFICATION_AGENDA_SUBSCRIPTION, 6000),
             this.modelRequestService.waitSubscriptionReady(NOTIFICATION_HISTORY_SUBSCRIPTION, 6000)
-        ]);
+        ];
+        readyCalls.push(this.modelRequestService.waitSubscriptionReady(NOTIFICATION_STATE_SUBSCRIPTION, 6000));
+        await Promise.allSettled(readyCalls);
+        this.stateSubscriptionMeetingUserId[meetingId] = this.getCurrentMeetingUserId(meetingId);
     }
 
     private closeModelSubscriptions(): void {
@@ -902,6 +1095,127 @@ export class MeetingChangeNotificationService {
         this.modelRequestService.closeSubscription(NOTIFICATION_ASSIGNMENT_SUBSCRIPTION);
         this.modelRequestService.closeSubscription(NOTIFICATION_AGENDA_SUBSCRIPTION);
         this.modelRequestService.closeSubscription(NOTIFICATION_HISTORY_SUBSCRIPTION);
+        this.modelRequestService.closeSubscription(NOTIFICATION_STATE_SUBSCRIPTION);
+    }
+
+    public async refreshStateFromServerNow(): Promise<void> {
+        if (!this.activeMeetingId) {
+            return;
+        }
+        await this.refreshStateFromServer(this.activeMeetingId);
+    }
+
+    private async refreshStateFromServer(meetingId: Id): Promise<void> {
+        if (this.activeMeetingId !== meetingId || !this.operator.isAuthenticated) {
+            return;
+        }
+        this.ensureStateSubscriptionForMeeting(meetingId);
+        const stateConfig = this.getStateSubscriptionConfig(meetingId);
+
+        try {
+            const fetchedModelData = await this.modelRequestService.fetch(
+                {
+                    modelRequest: {
+                        ...stateConfig.modelRequest
+                    },
+                    subscriptionName: `${NOTIFICATION_STATE_SUBSCRIPTION}-manual-refresh`
+                },
+                50
+            );
+            const remoteState = this.getNotificationStateFromFetchedModelData(meetingId, fetchedModelData);
+            if (remoteState !== undefined) {
+                this.applyRemoteState(meetingId, remoteState, true);
+                return;
+            }
+        } catch (e) {
+            // Fallback to state subscription refresh.
+        }
+
+        try {
+            await this.modelRequestService.updateSubscribeTo(stateConfig);
+            await this.modelRequestService.waitSubscriptionReady(NOTIFICATION_STATE_SUBSCRIPTION, 3000);
+        } catch (e) {
+            // Keep last known client state.
+        }
+
+        this.tryLoadMeetingStateFromServer(meetingId, true);
+    }
+
+    private getNotificationStateFromFetchedModelData(meetingId: Id, modelData: ModelData): any | undefined {
+        const operatorId = this.operator.operatorId;
+        if (!operatorId || !modelData[`meeting_user`]) {
+            return undefined;
+        }
+
+        const meetingUsers = modelData[`meeting_user`] as Record<number, Record<string, any>>;
+        const meetingUserId = this.meetingUserRepo.getMeetingUserId(operatorId, meetingId);
+        if (
+            meetingUserId &&
+            meetingUsers[meetingUserId] &&
+            Object.prototype.hasOwnProperty.call(meetingUsers[meetingUserId], `notification_state`)
+        ) {
+            return meetingUsers[meetingUserId][`notification_state`];
+        }
+
+        for (const partialMeetingUser of Object.values(meetingUsers)) {
+            if (
+                partialMeetingUser[`user_id`] === operatorId &&
+                partialMeetingUser[`meeting_id`] === meetingId &&
+                Object.prototype.hasOwnProperty.call(partialMeetingUser, `notification_state`)
+            ) {
+                return partialMeetingUser[`notification_state`];
+            }
+        }
+
+        return undefined;
+    }
+
+    private getStateSubscriptionConfig(meetingId: Id): {
+        modelRequest: any;
+        subscriptionName: string;
+    } {
+        const meetingUserId = this.getCurrentMeetingUserId(meetingId);
+        if (meetingUserId) {
+            return {
+                modelRequest: {
+                    viewModelCtor: ViewMeetingUser,
+                    ids: [meetingUserId],
+                    fieldset: [`id`, `meeting_id`, `user_id`, `notification_state`]
+                },
+                subscriptionName: NOTIFICATION_STATE_SUBSCRIPTION
+            };
+        }
+
+        return {
+            modelRequest: {
+                viewModelCtor: ViewMeeting,
+                ids: [meetingId],
+                follow: [
+                    {
+                        idField: `meeting_user_ids`,
+                        fieldset: [`id`, `meeting_id`, `user_id`, `notification_state`]
+                    }
+                ]
+            },
+            subscriptionName: NOTIFICATION_STATE_SUBSCRIPTION
+        };
+    }
+
+    private getCurrentMeetingUserId(meetingId: Id): Id | null {
+        const operatorId = this.operator.operatorId;
+        if (!operatorId) {
+            return null;
+        }
+        return this.meetingUserRepo.getMeetingUserId(operatorId, meetingId);
+    }
+
+    private ensureStateSubscriptionForMeeting(meetingId: Id): void {
+        const meetingUserId = this.getCurrentMeetingUserId(meetingId);
+        if (!meetingUserId || this.stateSubscriptionMeetingUserId[meetingId] === meetingUserId) {
+            return;
+        }
+        this.stateSubscriptionMeetingUserId[meetingId] = meetingUserId;
+        void this.modelRequestService.updateSubscribeTo(this.getStateSubscriptionConfig(meetingId));
     }
 
     private canSeeMotions(): boolean {
@@ -973,7 +1287,7 @@ export class MeetingChangeNotificationService {
 
         state.unreadIds = nextUnread;
         this.updateSubjects();
-        void this.saveToStorage();
+        void this.saveToStorage(true);
     }
 
     private isVisitedByCurrentRoute(
@@ -1029,6 +1343,13 @@ export class MeetingChangeNotificationService {
     }
 
     private sameStringArrays(left: string[], right: string[]): boolean {
+        if (left.length !== right.length) {
+            return false;
+        }
+        return left.every((value, index) => value === right[index]);
+    }
+
+    private sameIdArrays(left: Id[], right: Id[]): boolean {
         if (left.length !== right.length) {
             return false;
         }

@@ -4,6 +4,7 @@
         mat-icon-button
         [matMenuTriggerFor]="notificationMenu"
         matTooltip="{{ 'Notifications' | translate }}"
+        (click)="refreshNotificationsFromServer()"
     >
         <mat-icon>notifications</mat-icon>
         @let unreadCount = unreadCountObservable | async;

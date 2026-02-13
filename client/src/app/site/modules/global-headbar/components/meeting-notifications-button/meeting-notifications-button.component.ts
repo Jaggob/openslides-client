@@ -29,6 +29,10 @@ export class MeetingNotificationsButtonComponent {
         this.notificationService.clearMeetingNotifications();
     }
 
+    public async refreshNotificationsFromServer(): Promise<void> {
+        await this.notificationService.refreshStateFromServerNow();
+    }
+
     public clearReadNotifications(): void {
         this.notificationService.clearReadNotifications();
     }

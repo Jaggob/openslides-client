@@ -179,10 +179,10 @@ export class AutoupdateService {
      * @param description A simple description for developing. It helps tracking streams:
      * Which component opens which stream?
      */
-    public async single(modelRequest: ModelRequestObject, description: string): Promise<ModelData> {
+    public async single(modelRequest: ModelRequestObject, description: string, single: true | number = 1): Promise<ModelData> {
         const request = modelRequest.getModelRequest();
         console.debug(`[autoupdate] new single request:`, description, [modelRequest, request]);
-        const modelSubscription = await this.request(request, description, null, { single: 1 });
+        const modelSubscription = await this.request(request, description, null, { single });
         this._activeRequestObjects[modelSubscription.id] = { modelRequest, modelSubscription, description };
         const data = await modelSubscription.receivedData;
         modelSubscription.close();

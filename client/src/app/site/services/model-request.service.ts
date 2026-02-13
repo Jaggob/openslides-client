@@ -77,9 +77,12 @@ export class ModelRequestService {
         await Promise.all(subscribeToCalls);
     }
 
-    public async fetch({ modelRequest, subscriptionName }: SubscribeToConfig): Promise<ModelData> {
+    public async fetch(
+        { modelRequest, subscriptionName }: SubscribeToConfig,
+        single: true | number = 1
+    ): Promise<ModelData> {
         const request = await this.modelRequestBuilder.build(modelRequest);
-        return await this.autoupdateService.single(request, `${subscriptionName}:single`);
+        return await this.autoupdateService.single(request, `${subscriptionName}:single`, single);
     }
 
     public async subscriptionGotData(subscriptionName: string): Promise<boolean | ModelData> {
