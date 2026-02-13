@@ -54,6 +54,8 @@ export class MeetingNotificationsButtonComponent {
                 return `New motion`;
             case `amendment`:
                 return `New amendment`;
+            case `assignment`:
+                return `New election`;
             case `candidate`:
                 return `New candidate`;
             case `candidate_self`:
@@ -73,6 +75,7 @@ export class MeetingNotificationsButtonComponent {
             case `motion`:
             case `amendment`:
                 return `assignment`;
+            case `assignment`:
             case `candidate`:
             case `candidate_self`:
                 return `how_to_vote`;

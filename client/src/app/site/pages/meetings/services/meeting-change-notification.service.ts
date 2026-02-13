@@ -4,6 +4,7 @@ import { BehaviorSubject, filter, Subscription } from 'rxjs';
 import { Id } from 'src/app/domain/definitions/key-types';
 import { Permission } from 'src/app/domain/definitions/permission';
 import { AgendaItemRepositoryService } from 'src/app/gateways/repositories/agenda';
+import { AssignmentRepositoryService } from 'src/app/gateways/repositories/assignments/assignment-repository.service/assignment-repository.service';
 import { AssignmentCandidateRepositoryService } from 'src/app/gateways/repositories/assignments/assignment-candidate-repository.service/assignment-candidate-repository.service';
 import { HistoryEntryRepositoryService } from 'src/app/gateways/repositories/history-entry/history-entry-repository.service';
 import { ViewHistoryEntry } from 'src/app/gateways/repositories/history-entry/view-history-entry';
@@ -41,6 +42,7 @@ const HISTORY_ENTRY_AGENDA_REMOVED = `Agenda item removed`;
 export type MeetingNotificationType =
     | `motion`
     | `amendment`
+    | `assignment`
     | `candidate`
     | `candidate_self`
     | `agenda_added`
@@ -53,6 +55,7 @@ interface MeetingNotificationState {
     unreadIds: string[];
     dismissedIds?: string[];
     knownMotionIds?: Id[];
+    knownAssignmentIds?: Id[];
     knownAssignmentCandidateIds?: Id[];
     knownAgendaItemIds?: Id[];
     fallbackSeenAt?: Record<string, number>;
@@ -74,7 +77,7 @@ export interface MeetingChangeNotification {
      */
     templateKey?: string;
     templateParams?: Record<string, string | number | boolean>;
-    entityType?: `motion` | `assignment_candidate` | `agenda_item` | `topic`;
+    entityType?: `motion` | `assignment` | `assignment_candidate` | `agenda_item` | `topic`;
     entityId?: Id;
     groupKey?: string;
     createdAt: number;
@@ -140,6 +143,7 @@ export class MeetingChangeNotificationService {
         private userRepo: UserRepositoryService,
         private meetingUserRepo: MeetingUserRepositoryService,
         private motionRepo: MotionRepositoryService,
+        private assignmentRepo: AssignmentRepositoryService,
         private agendaItemRepo: AgendaItemRepositoryService,
         private assignmentCandidateRepo: AssignmentCandidateRepositoryService,
         private historyEntryRepo: HistoryEntryRepositoryService
@@ -356,6 +360,9 @@ export class MeetingChangeNotificationService {
             const nextKnownMotionIds = Array.isArray(notificationState.knownMotionIds)
                 ? [...notificationState.knownMotionIds]
                 : [...(state.knownMotionIds || [])];
+            const nextKnownAssignmentIds = Array.isArray(notificationState.knownAssignmentIds)
+                ? [...notificationState.knownAssignmentIds]
+                : [...(state.knownAssignmentIds || [])];
             const nextKnownAssignmentCandidateIds = Array.isArray(notificationState.knownAssignmentCandidateIds)
                 ? [...notificationState.knownAssignmentCandidateIds]
                 : [...(state.knownAssignmentCandidateIds || [])];
@@ -372,6 +379,7 @@ export class MeetingChangeNotificationService {
                 !this.sameStringArrays(state.unreadIds, nextUnreadIds) ||
                 !this.sameStringArrays(state.dismissedIds || [], nextDismissedIds) ||
                 !this.sameIdArrays(state.knownMotionIds || [], nextKnownMotionIds) ||
+                !this.sameIdArrays(state.knownAssignmentIds || [], nextKnownAssignmentIds) ||
                 !this.sameIdArrays(state.knownAssignmentCandidateIds || [], nextKnownAssignmentCandidateIds) ||
                 !this.sameIdArrays(state.knownAgendaItemIds || [], nextKnownAgendaItemIds) ||
                 JSON.stringify(state.fallbackSeenAt || {}) !== JSON.stringify(nextFallbackSeenAt);
@@ -380,6 +388,7 @@ export class MeetingChangeNotificationService {
             state.unreadIds = nextUnreadIds;
             state.dismissedIds = nextDismissedIds;
             state.knownMotionIds = nextKnownMotionIds;
+            state.knownAssignmentIds = nextKnownAssignmentIds;
             state.knownAssignmentCandidateIds = nextKnownAssignmentCandidateIds;
             state.knownAgendaItemIds = nextKnownAgendaItemIds;
             state.fallbackSeenAt = nextFallbackSeenAt;
@@ -405,6 +414,7 @@ export class MeetingChangeNotificationService {
         const state = this.getMeetingState(meetingId);
         const fallbackStateBefore = JSON.stringify({
             knownMotionIds: state.knownMotionIds,
+            knownAssignmentIds: state.knownAssignmentIds,
             knownAssignmentCandidateIds: state.knownAssignmentCandidateIds,
             knownAgendaItemIds: state.knownAgendaItemIds,
             fallbackSeenAt: state.fallbackSeenAt
@@ -418,6 +428,7 @@ export class MeetingChangeNotificationService {
         );
         const fallbackStateAfter = JSON.stringify({
             knownMotionIds: state.knownMotionIds,
+            knownAssignmentIds: state.knownAssignmentIds,
             knownAssignmentCandidateIds: state.knownAssignmentCandidateIds,
             knownAgendaItemIds: state.knownAgendaItemIds,
             fallbackSeenAt: state.fallbackSeenAt
@@ -497,6 +508,7 @@ export class MeetingChangeNotificationService {
         dismissedIds: Set<string>
     ): MeetingChangeNotification[] {
         state.knownMotionIds ??= [];
+        state.knownAssignmentIds ??= [];
         state.knownAssignmentCandidateIds ??= [];
         state.knownAgendaItemIds ??= [];
         state.fallbackSeenAt ??= {};
@@ -505,6 +517,10 @@ export class MeetingChangeNotificationService {
             .getViewModelList()
             .filter(motion => motion.meeting_id === meetingId)
             .map(motion => motion.id);
+        const currentAssignmentIds = this.assignmentRepo
+            .getViewModelList()
+            .filter(assignment => assignment.meeting_id === meetingId)
+            .map(assignment => assignment.id);
         const currentCandidateIds = this.assignmentCandidateRepo
             .getViewModelList()
             .filter(candidate => candidate.meeting_id === meetingId)
@@ -516,10 +532,12 @@ export class MeetingChangeNotificationService {
 
         const hasBaseline =
             state.knownMotionIds.length > 0 ||
+            state.knownAssignmentIds.length > 0 ||
             state.knownAssignmentCandidateIds.length > 0 ||
             state.knownAgendaItemIds.length > 0;
         if (!hasBaseline) {
             state.knownMotionIds = [...new Set(currentMotionIds)];
+            state.knownAssignmentIds = [...new Set(currentAssignmentIds)];
             state.knownAssignmentCandidateIds = [...new Set(currentCandidateIds)];
             state.knownAgendaItemIds = [...new Set(currentAgendaIds)];
             return [];
@@ -529,6 +547,12 @@ export class MeetingChangeNotificationService {
             `motion`,
             currentMotionIds,
             state.knownMotionIds,
+            state.fallbackSeenAt
+        );
+        this.captureNewFallbackEntitySeenAt(
+            `assignment`,
+            currentAssignmentIds,
+            state.knownAssignmentIds,
             state.fallbackSeenAt
         );
         this.captureNewFallbackEntitySeenAt(
@@ -563,6 +587,15 @@ export class MeetingChangeNotificationService {
                   )
                   .filter((notification): notification is MeetingChangeNotification => !!notification)
             : [];
+        const assignmentNotifications = this.canSeeAssignments()
+            ? this.assignmentRepo
+                  .getViewModelList()
+                  .filter(assignment => assignment.meeting_id === meetingId)
+                  .map(assignment =>
+                      this.createFallbackAssignmentNotification(meetingId, assignment.id, state.fallbackSeenAt || {})
+                  )
+                  .filter((notification): notification is MeetingChangeNotification => !!notification)
+            : [];
 
         const agendaNotifications = this.canSeeAgenda()
             ? this.agendaItemRepo
@@ -574,14 +607,14 @@ export class MeetingChangeNotificationService {
                   .filter((notification): notification is MeetingChangeNotification => !!notification)
             : [];
 
-        return [...motionNotifications, ...candidateNotifications, ...agendaNotifications]
+        return [...motionNotifications, ...assignmentNotifications, ...candidateNotifications, ...agendaNotifications]
             .filter(notification => notification.createdAt >= firstSeenAt)
             .filter(notification => !dismissedIds.has(notification.id))
             .sort((a, b) => b.createdAt - a.createdAt);
     }
 
     private captureNewFallbackEntitySeenAt(
-        entityType: `motion` | `assignment_candidate` | `agenda_item`,
+        entityType: `motion` | `assignment` | `assignment_candidate` | `agenda_item`,
         currentIds: Id[],
         knownIds: Id[],
         fallbackSeenAt: Record<string, number>
@@ -636,6 +669,38 @@ export class MeetingChangeNotificationService {
             return undefined;
         }
         return this.createCandidateNotification(meetingId, candidateId, candidateId, createdAt);
+    }
+
+    private createFallbackAssignmentNotification(
+        meetingId: Id,
+        assignmentId: Id,
+        fallbackSeenAt: Record<string, number>
+    ): MeetingChangeNotification | undefined {
+        const createdAt = fallbackSeenAt[`assignment:${assignmentId}`] || 0;
+        if (!createdAt) {
+            return undefined;
+        }
+        const assignment = this.assignmentRepo.getViewModel(assignmentId);
+        if (!assignment) {
+            return undefined;
+        }
+
+        return {
+            id: this.getAssignmentNotificationId(assignmentId),
+            meetingId,
+            createdAt,
+            type: `assignment`,
+            title: assignment.title || `Election`,
+            subtitle: `Elections`,
+            route: assignment.sequential_number
+                ? [`/`, `${meetingId}`, `assignments`, `${assignment.sequential_number}`]
+                : [`/`, `${meetingId}`, `assignments`],
+            templateKey: `notification.assignment.created`,
+            templateParams: { assignmentId },
+            entityType: `assignment`,
+            entityId: assignmentId,
+            groupKey: `assignment:${assignmentId}`
+        };
     }
 
     private createFallbackAgendaAddedNotification(
@@ -883,6 +948,10 @@ export class MeetingChangeNotificationService {
         return `assignment-candidate-${candidateId}`;
     }
 
+    private getAssignmentNotificationId(assignmentId: Id): string {
+        return `assignment-${assignmentId}`;
+    }
+
     private getAgendaNotificationId(type: `agenda_added` | `agenda_updated` | `agenda_removed`, agendaItemId: Id): string {
         return `agenda-${type}-${agendaItemId}`;
     }
@@ -894,6 +963,7 @@ export class MeetingChangeNotificationService {
                 unreadIds: [],
                 dismissedIds: [],
                 knownMotionIds: [],
+                knownAssignmentIds: [],
                 knownAssignmentCandidateIds: [],
                 knownAgendaItemIds: [],
                 fallbackSeenAt: {}
@@ -903,6 +973,7 @@ export class MeetingChangeNotificationService {
             this.byMeeting[meetingId].dismissedIds = [];
         }
         this.byMeeting[meetingId].knownMotionIds ??= [];
+        this.byMeeting[meetingId].knownAssignmentIds ??= [];
         this.byMeeting[meetingId].knownAssignmentCandidateIds ??= [];
         this.byMeeting[meetingId].knownAgendaItemIds ??= [];
         this.byMeeting[meetingId].fallbackSeenAt ??= {};
@@ -953,6 +1024,7 @@ export class MeetingChangeNotificationService {
                 unreadIds,
                 dismissedIds,
                 knownMotionIds: [...(meetingState.knownMotionIds || [])],
+                knownAssignmentIds: [...(meetingState.knownAssignmentIds || [])],
                 knownAssignmentCandidateIds: [...(meetingState.knownAssignmentCandidateIds || [])],
                 knownAgendaItemIds: [...(meetingState.knownAgendaItemIds || [])],
                 fallbackSeenAt: { ...(meetingState.fallbackSeenAt || {}) }
@@ -993,6 +1065,7 @@ export class MeetingChangeNotificationService {
             unreadIds: state.unreadIds,
             dismissedIds: state.dismissedIds || [],
             knownMotionIds: state.knownMotionIds || [],
+            knownAssignmentIds: state.knownAssignmentIds || [],
             knownAssignmentCandidateIds: state.knownAssignmentCandidateIds || [],
             knownAgendaItemIds: state.knownAgendaItemIds || [],
             fallbackSeenAt: state.fallbackSeenAt || {}
@@ -1245,6 +1318,7 @@ export class MeetingChangeNotificationService {
             case `motion`:
             case `amendment`:
                 return this.canSeeMotions();
+            case `assignment`:
             case `candidate`:
             case `candidate_self`:
                 return this.canSeeAssignments();
@@ -1313,6 +1387,7 @@ export class MeetingChangeNotificationService {
                     !!notificationDetailSegment &&
                     (currentPath === notificationPath || currentPath.startsWith(`${notificationPath}/`))
                 );
+            case `assignment`:
             case `candidate`:
             case `candidate_self`:
                 return (
