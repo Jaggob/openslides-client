@@ -270,7 +270,9 @@ export class ParticipantCreateWizardComponent extends BaseMeetingComponent imple
             const payload = {
                 ...this.personalInfoFormValue,
                 vote_delegated_to_ids: this.personalInfoFormValue.vote_delegated_to_ids
-                    ? [this.repo.getViewModel(this.personalInfoFormValue.vote_delegated_to_ids).getMeetingUser().id]
+                    ? this.personalInfoFormValue.vote_delegated_to_ids
+                          .map((id: Id) => this.repo.getViewModel(id).getMeetingUser().id)
+                          .filter((id: Id | undefined) => !!id)
                     : [],
                 vote_delegations_from_ids: this.personalInfoFormValue.vote_delegations_from_ids
                     ? this.personalInfoFormValue.vote_delegations_from_ids

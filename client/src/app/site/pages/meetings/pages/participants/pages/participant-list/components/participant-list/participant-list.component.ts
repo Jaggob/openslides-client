@@ -370,7 +370,7 @@ export class ParticipantListComponent extends BaseMeetingListViewComponent<ViewU
             number: user.number(),
             structure_level_ids: user.structure_level_ids(),
             vote_delegations_from_ids: user.vote_delegations_from_meeting_user_ids(),
-            vote_delegated_to_ids: user.vote_delegated_to_meeting_user_ids()[0]
+            vote_delegated_to_ids: user.vote_delegated_to_meeting_user_ids()
         });
 
         dialogRef.afterClosed().subscribe(async result => {
@@ -378,12 +378,9 @@ export class ParticipantListComponent extends BaseMeetingListViewComponent<ViewU
                 if (!result.group_ids?.length) {
                     result.group_ids = [this.activeMeeting!.default_group_id];
                 }
-                if (result.vote_delegated_to_ids === 0) {
-                    result.vote_delegated_to_ids = null;
-                }
                 const payload = {
                     ...result,
-                    vote_delegated_to_ids: result.vote_delegated_to_ids ? [result.vote_delegated_to_ids] : []
+                    vote_delegated_to_ids: result.vote_delegated_to_ids ?? []
                 };
                 if (
                     !(
