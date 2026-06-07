@@ -370,7 +370,7 @@ export class ParticipantListComponent extends BaseMeetingListViewComponent<ViewU
             number: user.number(),
             structure_level_ids: user.structure_level_ids(),
             vote_delegations_from_ids: user.vote_delegations_from_meeting_user_ids(),
-            vote_delegated_to_id: user.vote_delegated_to_meeting_user_id()
+            vote_delegated_to_ids: user.vote_delegated_to_meeting_user_ids()
         });
 
         dialogRef.afterClosed().subscribe(async result => {
@@ -378,9 +378,10 @@ export class ParticipantListComponent extends BaseMeetingListViewComponent<ViewU
                 if (!result.group_ids?.length) {
                     result.group_ids = [this.activeMeeting!.default_group_id];
                 }
-                if (result.vote_delegated_to_id === 0) {
-                    result.vote_delegated_to_id = null;
-                }
+                const payload = {
+                    ...result,
+                    vote_delegated_to_ids: result.vote_delegated_to_ids ?? []
+                };
                 if (
                     !(
                         user.id === this.operator.operatorId &&
@@ -394,9 +395,9 @@ export class ParticipantListComponent extends BaseMeetingListViewComponent<ViewU
                         !this.operator.hasPerms(Permission.userCanUpdate) &&
                         user.id === this.operator.operatorId
                     ) {
-                        this.repo.updateSelfDelegation(result, user);
+                        this.repo.updateSelfDelegation(payload, user);
                     } else {
-                        this.repo.update(result, user).resolve();
+                        this.repo.update(payload, user).resolve();
                     }
                 }
             }

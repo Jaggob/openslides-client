@@ -657,7 +657,7 @@ export class OperatorService {
 
     public isAllowedWithDelegation(...appliedSettings: DelegationSetting[]): boolean {
         return (
-            !this.user.getMeetingUser(this.activeMeetingId)?.vote_delegated_to_id ||
+            !this.user.getMeetingUser(this.activeMeetingId)?.vote_delegated_to_ids?.length ||
             !appliedSettings.some(appliedSetting => this.meetingSettings.instant(appliedSetting as keyof Settings))
         );
     }
@@ -835,7 +835,7 @@ export class OperatorService {
                         fieldset: `all`,
                         follow: [
                             {
-                                idField: `vote_delegated_to_id`,
+                                idField: `vote_delegated_to_ids`,
                                 fieldset: [`meeting_id`, `group_ids`],
                                 follow: [
                                     {

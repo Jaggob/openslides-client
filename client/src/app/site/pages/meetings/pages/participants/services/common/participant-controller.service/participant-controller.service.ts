@@ -47,7 +47,7 @@ export const MEETING_RELATED_FORM_CONTROLS = [
     `comment`,
     `group_ids`,
     `vote_delegations_from_ids`,
-    `vote_delegated_to_id`,
+    `vote_delegated_to_ids`,
     `is_present`,
     `locked_out`
 ];
@@ -355,7 +355,7 @@ export class ParticipantControllerService extends BaseMeetingControllerService<V
                     structure_level_ids: this.validateField(participant, `structure_level_ids`),
                     number: this.validateField(participant, `number`),
                     vote_weight: toDecimal(this.validateField(participant, `vote_weight`), false),
-                    vote_delegated_to_id: this.validateField(participant, `vote_delegated_to_id`),
+                    vote_delegated_to_ids: this.validateField(participant, `vote_delegated_to_ids`),
                     vote_delegations_from_ids: this.validateField(participant, `vote_delegations_from_ids`),
                     about_me: this.validateField(participant, `about_me`),
                     comment: this.validateField(participant, `comment`),
