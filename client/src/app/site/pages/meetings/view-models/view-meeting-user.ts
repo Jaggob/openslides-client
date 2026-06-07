@@ -42,7 +42,7 @@ interface IMeetingUserRelations {
     submitted_motions: ViewMotionSubmitter[];
     motion_editors: ViewMotionEditor[];
     motion_working_group_speakers: ViewMotionWorkingGroupSpeaker[];
-    vote_delegated_to: ViewMeetingUser;
+    vote_delegated_to: ViewMeetingUser[];
     vote_delegations_from: ViewMeetingUser[];
     vote_delegated_votes: ViewVote[];
     structure_levels: ViewStructureLevel[];

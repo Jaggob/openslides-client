@@ -27,7 +27,7 @@
                                 <!-- Delegation -->
                                 @if (
                                     displayDelegation &&
-                                    entry.vote_delegated_to_user_id &&
+                                    entry.vote_delegated_to_user_ids?.length &&
                                     !entry.delegation_user_merged_into_id
                                 ) {
                                     <div>
@@ -37,7 +37,7 @@
                                         </span>
                                     </div>
                                 }
-                                @if (entry.vote_delegated_to_user_id && entry.delegation_user_merged_into_id) {
+                                @if (entry.vote_delegated_to_user_ids?.length && entry.delegation_user_merged_into_id) {
                                     <div>
                                         <span>
                                             {{ entry.delegation_user_merged_into }}
@@ -52,7 +52,9 @@
                             {{ entry.user_merged_into }}
                             <div class="user-subtitle">
                                 <!-- Delegation -->
-                                @if (entry.vote_delegated_to_user_id && !entry.delegation_user_merged_into_id) {
+                                @if (
+                                    entry.vote_delegated_to_user_ids?.length && !entry.delegation_user_merged_into_id
+                                ) {
                                     <div>
                                         <span>
                                             ({{ 'represented by' | translate }}
@@ -60,7 +62,7 @@
                                         </span>
                                     </div>
                                 }
-                                @if (entry.vote_delegated_to_user_id && entry.delegation_user_merged_into_id) {
+                                @if (entry.vote_delegated_to_user_ids?.length && entry.delegation_user_merged_into_id) {
                                     <div>
                                         <span>
                                             {{ entry.delegation_user_merged_into }}

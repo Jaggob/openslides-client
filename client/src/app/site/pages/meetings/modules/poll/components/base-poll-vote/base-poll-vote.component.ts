@@ -168,7 +168,7 @@ export abstract class BasePollVoteComponent<C extends PollContentObject = any> e
             this.operator.userObservable.pipe(debounceTime(50)).subscribe(user => {
                 if (
                     user &&
-                    (!user.getMeetingUser()?.vote_delegated_to_id || user.getMeetingUser()?.vote_delegated_to)
+                    (!user.getMeetingUser()?.vote_delegated_to_ids?.length || user.getMeetingUser()?.vote_delegated_to)
                 ) {
                     this.user = user;
                     this.delegations = user.vote_delegations_from();

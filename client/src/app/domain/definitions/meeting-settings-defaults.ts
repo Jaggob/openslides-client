@@ -83,6 +83,7 @@ export const meetingSettingsDefaults: Record<string, any> = {
     users_allow_self_set_present: true,
     users_enable_vote_weight: false,
     users_enable_vote_delegations: false,
+    users_vote_delegations_max_amount: 1,
     users_pdf_welcometitle: _(`Welcome to OpenSlides`),
     users_pdf_welcometext: _(`[Place for your welcome and help text.]`),
     users_pdf_wlan_encryption: `WPA`,
