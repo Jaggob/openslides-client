@@ -53,7 +53,7 @@ export class EntitledUsersTableComponent {
 
     public filterPropsEntitledUsersTable = [
         `user.full_name`,
-        `vote_delegated_to.full_name`,
+        `vote_delegated_to_names`,
         `user_merged_into`,
         `delegation_user_merged_into`,
         `voted_verbose`
@@ -66,5 +66,9 @@ export class EntitledUsersTableComponent {
 
     private getNameFromEntry(entry: EntitledUsersTableEntry): string {
         return (entry.user ?? this.controller.getViewModel(entry.user_id))?.getShortName();
+    }
+
+    public getDelegatedToShortNames(entry: EntitledUsersTableEntry): string {
+        return entry.vote_delegated_to_users?.map(user => user.getShortName()).join(`, `) ?? ``;
     }
 }

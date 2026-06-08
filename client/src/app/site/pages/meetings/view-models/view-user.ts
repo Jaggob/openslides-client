@@ -209,7 +209,7 @@ export class ViewUser extends BaseViewModel<User> /* implements Searchable */ {
     }
 
     public delegationName(meetingId?: Id): string | undefined {
-        return this.vote_delegated_to(meetingId || this.getEnsuredActiveMeetingId())?.getFullName();
+        return this.vote_delegated_to_names(meetingId || this.getEnsuredActiveMeetingId());
     }
 
     public speaker_ids(meetingId?: Id): Id[] {
@@ -362,14 +362,16 @@ export class ViewUser extends BaseViewModel<User> /* implements Searchable */ {
         return this.getMeetingUser(meetingId)?.vote_delegated_to ?? [];
     }
 
-    public vote_delegated_to(meetingId?: number): ViewUser {
-        return this.vote_delegated_to_users(meetingId)[0];
-    }
-
     public vote_delegated_to_users(meetingId?: number): ViewUser[] {
         return this.vote_delegated_to_meeting_users(meetingId)
             .map(meetingUser => meetingUser?.user)
             .filter(user => !!user);
+    }
+
+    public vote_delegated_to_names(meetingId?: number): string {
+        return this.vote_delegated_to_users(meetingId)
+            .map(user => user.getFullName())
+            .join(`, `);
     }
 
     public vote_delegations_from_meeting_users(meetingId?: number): ViewMeetingUser[] {
