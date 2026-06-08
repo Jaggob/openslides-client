@@ -657,16 +657,23 @@ export abstract class BasePollPdfService {
                   this.getUserNameForExport(this.userRepo.getViewModel(date.user_merged_into_id))
                 : this.getUserNameForExport(date.user);
             let represented = ``;
-            if (date.vote_delegated_to_user_ids?.length && !date.delegation_user_merged_into_ids?.length) {
-                represented =
-                    `\n${this.translate.instant(`represented by`)} ` +
-                    date.vote_delegated_to_users?.map(user => this.getUserNameForExport(user)).join(`, `);
-            } else if (date.vote_delegated_to_user_ids?.length && date.delegation_user_merged_into_ids?.length) {
-                represented =
-                    `\n${this.translate.instant(`represented by old account of`)} ` +
-                    date.delegation_user_merged_into_ids
-                        .map(userId => this.getUserNameForExport(this.userRepo.getViewModel(userId)))
-                        .join(`, `);
+            const representedByUsers = date.vote_delegated_to_users?.map(user => this.getUserNameForExport(user)) ?? [];
+            const representedByOldAccounts =
+                date.delegation_user_merged_into_ids?.map(userId =>
+                    this.getUserNameForExport(this.userRepo.getViewModel(userId))
+                ) ?? [];
+            const representationParts = [
+                representedByUsers.length
+                    ? `${this.translate.instant(`represented by`)} ${representedByUsers.join(`, `)}`
+                    : ``,
+                representedByOldAccounts.length
+                    ? `${this.translate.instant(`represented by old account of`)} ${representedByOldAccounts.join(
+                          `, `
+                      )}`
+                    : ``
+            ].filter(part => !!part);
+            if (representationParts.length) {
+                represented = `\n${representationParts.join(`, `)}`;
             }
             const tableLine = [
                 {
