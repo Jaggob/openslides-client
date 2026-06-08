@@ -208,7 +208,7 @@ export class ViewUser extends BaseViewModel<User> /* implements Searchable */ {
         return this.vote_delegations_from_ids(meetingId || this.getEnsuredActiveMeetingId())?.length > 0;
     }
 
-    public delegationName(meetingId?: Id): string | undefined {
+    public delegationName(meetingId?: Id): string {
         return this.vote_delegated_to_names(meetingId || this.getEnsuredActiveMeetingId());
     }
 

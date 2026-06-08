@@ -354,10 +354,7 @@ export abstract class BasePollDetailComponent<V extends PollContentObject, S ext
     }
 
     public hasUserVoteDelegation(user: ViewUser): boolean {
-        if (user.isVoteRightDelegated || this._currentOperator.canVoteFor(user)) {
-            return true;
-        }
-        return false;
+        return !!this.getUsersVoteDelegationNames(user);
     }
 
     public getUsersVoteDelegationNames(user: ViewUser): string {
