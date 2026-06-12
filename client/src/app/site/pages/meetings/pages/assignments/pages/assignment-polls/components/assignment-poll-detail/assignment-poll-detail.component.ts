@@ -61,8 +61,8 @@ export class AssignmentPollDetailComponent
         this.pollDialog.open(poll);
     }
 
-    public override getUsersVoteDelegation(user: ViewUser): ViewUser {
-        return super.getUsersVoteDelegation(user) as ViewUser;
+    public override getUsersVoteDelegationNames(user: ViewUser): string {
+        return super.getUsersVoteDelegationNames(user);
     }
 
     protected createVotesData(): BaseVoteData[] {

@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { EntitledUsersTableComponent } from './entitled-users-table.component';
+import { EntitledUsersTableComponent, getDelegatedToShortNames } from './entitled-users-table.component';
 
 xdescribe(`EntitledUsersTableComponent`, () => {
     let component: EntitledUsersTableComponent;
@@ -20,5 +20,17 @@ xdescribe(`EntitledUsersTableComponent`, () => {
 
     it(`should create`, () => {
         expect(component).toBeTruthy();
+    });
+});
+
+describe(`getDelegatedToShortNames`, () => {
+    it(`joins all delegated users instead of only showing the first one`, () => {
+        const users = [{ getShortName: () => `Alice Adams` }, { getShortName: () => `Bob Brown` }];
+
+        expect(getDelegatedToShortNames(users)).toBe(`Alice Adams, Bob Brown`);
+    });
+
+    it(`returns an empty string without delegated users`, () => {
+        expect(getDelegatedToShortNames([])).toBe(``);
     });
 });

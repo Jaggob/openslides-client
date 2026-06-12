@@ -25,19 +25,14 @@
                                     <div>{{ 'Vote weight' | translate }}: {{ entry.user.vote_weight() }}</div>
                                 }
                                 <!-- Delegation -->
-                                @if (
-                                    displayDelegation &&
-                                    entry.vote_delegated_to_user_ids?.length &&
-                                    !entry.delegation_user_merged_into_id
-                                ) {
+                                @if (displayDelegation && entry.vote_delegated_to_users?.length) {
                                     <div>
                                         <span>
-                                            ({{ 'represented by' | translate }}
-                                            {{ entry.vote_delegated_to?.getShortName() }})
+                                            ({{ 'represented by' | translate }} {{ getDelegatedToShortNames(entry) }})
                                         </span>
                                     </div>
                                 }
-                                @if (entry.vote_delegated_to_user_ids?.length && entry.delegation_user_merged_into_id) {
+                                @if (displayDelegation && entry.delegation_user_merged_into) {
                                     <div>
                                         <span>
                                             {{ entry.delegation_user_merged_into }}
@@ -52,17 +47,14 @@
                             {{ entry.user_merged_into }}
                             <div class="user-subtitle">
                                 <!-- Delegation -->
-                                @if (
-                                    entry.vote_delegated_to_user_ids?.length && !entry.delegation_user_merged_into_id
-                                ) {
+                                @if (displayDelegation && entry.vote_delegated_to_users?.length) {
                                     <div>
                                         <span>
-                                            ({{ 'represented by' | translate }}
-                                            {{ entry.vote_delegated_to?.getShortName() }})
+                                            ({{ 'represented by' | translate }} {{ getDelegatedToShortNames(entry) }})
                                         </span>
                                     </div>
                                 }
-                                @if (entry.vote_delegated_to_user_ids?.length && entry.delegation_user_merged_into_id) {
+                                @if (displayDelegation && entry.delegation_user_merged_into) {
                                     <div>
                                         <span>
                                             {{ entry.delegation_user_merged_into }}
