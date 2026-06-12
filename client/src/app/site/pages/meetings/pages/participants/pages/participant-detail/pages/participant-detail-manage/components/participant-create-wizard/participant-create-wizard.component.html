@@ -240,6 +240,8 @@
                                         </mat-label>
                                         <os-repo-search-selector
                                             formControlName="vote_delegated_to_ids"
+                                            [disableOptionWhenFn]="isDelegationsToOptionDisabledFn"
+                                            [includeNone]="false"
                                             [multiple]="true"
                                             [repo]="repo"
                                             [sortService]="sortService"
