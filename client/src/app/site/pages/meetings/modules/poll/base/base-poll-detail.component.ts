@@ -305,9 +305,10 @@ export abstract class BasePollDetailComponent<V extends PollContentObject, S ext
         }
         const delegates = new Set<Id>([]);
         Array.from(userIds).forEach(userId => {
-            if (this.userRepo.getViewModel(userId)?.vote_delegated_to_id()) {
-                delegates.add(this.userRepo.getViewModel(userId)?.vote_delegated_to_id());
-            }
+            this.userRepo
+                .getViewModel(userId)
+                ?.vote_delegated_to_ids()
+                .forEach(delegateId => delegates.add(delegateId));
         });
         userIds.update(delegates);
         this.subscriptions.push(
@@ -356,10 +357,7 @@ export abstract class BasePollDetailComponent<V extends PollContentObject, S ext
 
     public getUsersVoteDelegation(user: ViewUser): ViewUser | null {
         if (user.isVoteRightDelegated) {
-            return (
-                user.vote_delegated_to(this.activeMeetingId!) ??
-                this.userRepo.getViewModel(user.vote_delegated_to_id(this.activeMeetingId))
-            );
+            return user.vote_delegated_to_users(this.activeMeetingId!)?.[0] ?? null;
         }
 
         if (this._currentOperator.canVoteFor(user)) {

@@ -146,13 +146,13 @@
                     <os-icon-container icon="perm_identity">{{ user.number() }}</os-icon-container>
                 </div>
             }
-            @if (user.vote_delegated_to() && voteDelegationEnabled) {
+            @if (user.vote_delegated_to_names() && voteDelegationEnabled) {
                 <div
                     class="spacer-top-5"
                     matTooltip="{{ 'Voting right delegated to (proxy)' | translate }}"
                     matTooltipPosition="left"
                 >
-                    <os-icon-container icon="forward" [noWrap]="true">{{ user.vote_delegated_to() }}</os-icon-container>
+                    <os-icon-container icon="forward" [noWrap]="true">{{ user.vote_delegated_to_names() }}</os-icon-container>
                 </div>
             }
             @if (user.vote_delegations_from_ids()?.length && voteDelegationEnabled) {
