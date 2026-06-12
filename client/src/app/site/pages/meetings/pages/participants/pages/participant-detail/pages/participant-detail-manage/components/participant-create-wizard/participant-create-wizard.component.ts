@@ -271,8 +271,9 @@ export class ParticipantCreateWizardComponent extends BaseMeetingComponent imple
                 ...this.personalInfoFormValue,
                 vote_delegated_to_ids: this.personalInfoFormValue.vote_delegated_to_ids
                     ? this.personalInfoFormValue.vote_delegated_to_ids
-                          .map((id: Id) => this.repo.getViewModel(id).getMeetingUser().id)
                           .filter((id: Id) => !!id)
+                          .map((id: Id) => this.repo.getViewModel(id)?.getMeetingUser()?.id)
+                          .filter((id: Id | undefined) => !!id)
                     : [],
                 vote_delegations_from_ids: this.personalInfoFormValue.vote_delegations_from_ids
                     ? this.personalInfoFormValue.vote_delegations_from_ids

@@ -316,7 +316,8 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
                 ...this.personalInfoFormValue,
                 vote_delegated_to_ids: this.personalInfoFormValue.vote_delegated_to_ids
                     ? this.personalInfoFormValue.vote_delegated_to_ids
-                          .map(id => this.repo.getViewModel(id).getMeetingUser().id)
+                          .filter(id => !!id)
+                          .map(id => this.repo.getViewModel(id)?.getMeetingUser()?.id)
                           .filter(id => !!id)
                     : [],
                 vote_delegations_from_ids: this.personalInfoFormValue.vote_delegations_from_ids
