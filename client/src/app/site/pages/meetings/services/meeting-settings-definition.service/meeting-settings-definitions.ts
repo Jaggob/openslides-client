@@ -1002,6 +1002,14 @@ export const meetingSettings: SettingsGroup[] = fillInSettingsDefaults([
                         type: `boolean`
                     },
                     {
+                        key: `users_vote_delegations_max_amount`,
+                        label: _(`Maximum number of vote delegations per principal`),
+                        type: `integer`,
+                        validators: [Validators.min(1)],
+                        indentation: 1,
+                        disable: settings => !settings.users_enable_vote_delegations
+                    },
+                    {
                         key: `users_forbid_delegator_to_vote`,
                         label: _(`Restrict delegation principals from voting`),
                         type: `boolean`,

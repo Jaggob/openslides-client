@@ -51,8 +51,8 @@ export class ParticipantCreateWizardComponent extends BaseMeetingComponent imple
         about_me: [``],
         comment: [``],
         group_ids: [``],
-        vote_delegations_from_ids: [``],
-        vote_delegated_to_ids: [``],
+        vote_delegations_from_ids: [[]],
+        vote_delegated_to_ids: [[]],
         is_present: [``],
         locked_out: [``],
         home_committee_id: [``],
@@ -141,7 +141,64 @@ export class ParticipantCreateWizardComponent extends BaseMeetingComponent imple
         return this.personalInfoFormValue.vote_weight < 0.000001;
     }
 
+    public get canDelegateVote(): boolean {
+        return ((this.personalInfoFormValue?.vote_delegations_from_ids as Id[]) ?? []).length === 0;
+    }
+
+    public get canReceiveDelegations(): boolean {
+        return ((this.personalInfoFormValue?.vote_delegated_to_ids as Id[]) ?? []).length === 0;
+    }
+
+    public readonly isDelegationsToOptionDisabledFn = (user: ViewUser): boolean => {
+        const selectedIds = ((this.personalInfoFormValue?.vote_delegated_to_ids as Id[]) ?? []).filter(id => !!id);
+        if (selectedIds.includes(user.id)) {
+            return false;
+        }
+        const maxAmountReached = selectedIds.length >= this._voteDelegationsMaxAmount && !selectedIds.includes(user.id);
+        const ownMeetingUserId = this.getAccountMeetingUserId();
+        const targetDelegatedToIds = user.vote_delegated_to_meeting_user_ids(this.activeMeetingId) ?? [];
+        const targetHasIncompatibleDelegation =
+            targetDelegatedToIds.length > 0 &&
+            (ownMeetingUserId === undefined || !targetDelegatedToIds.includes(ownMeetingUserId));
+        return (
+            !this.canDelegateVote ||
+            user.id === this._accountId ||
+            maxAmountReached ||
+            targetHasIncompatibleDelegation ||
+            ((this.personalInfoFormValue?.vote_delegations_from_ids as Id[]) ?? []).includes(user.id)
+        );
+    };
+
+    public readonly isDelegationsFromOptionDisabledFn = (user: ViewUser): boolean => {
+        const selectedIds = ((this.personalInfoFormValue?.vote_delegations_from_ids as Id[]) ?? []).filter(id => !!id);
+        if (selectedIds.includes(user.id)) {
+            return false;
+        }
+        if (!this.canReceiveDelegations || user.id === this._accountId) {
+            return true;
+        }
+
+        const ownMeetingUserId = this.getAccountMeetingUserId();
+        const targetDelegatedToIds = user.vote_delegated_to_meeting_user_ids(this.activeMeetingId) ?? [];
+        const targetAlreadyDelegatesToCurrent =
+            ownMeetingUserId !== undefined && targetDelegatedToIds.includes(ownMeetingUserId);
+        const targetWouldExceedMaxAmount =
+            !targetAlreadyDelegatesToCurrent && targetDelegatedToIds.length >= this._voteDelegationsMaxAmount;
+        const targetDelegationsFromIds = user.vote_delegations_from_meeting_user_ids(this.activeMeetingId) ?? [];
+        const targetReceivesIncompatibleDelegations =
+            targetDelegationsFromIds.length > 0 &&
+            (ownMeetingUserId === undefined ||
+                targetDelegationsFromIds.length !== 1 ||
+                targetDelegationsFromIds[0] !== ownMeetingUserId);
+
+        return targetWouldExceedMaxAmount || targetReceivesIncompatibleDelegations;
+    };
+
     public sortFn = (groupA: ViewGroup, groupB: ViewGroup): number => groupA.weight - groupB.weight;
+
+    private getAccountMeetingUserId(): Id | undefined {
+        return (this.account as ViewUser | null)?.getMeetingUser?.(this.activeMeetingId)?.id;
+    }
 
     private readonly _currentStepIndexSubject = new BehaviorSubject<number>(0);
 
@@ -150,6 +207,7 @@ export class ParticipantCreateWizardComponent extends BaseMeetingComponent imple
     private _isUserInScope = false;
     private _isVoteWeightEnabled = false;
     private _isVoteDelegationEnabled = false;
+    private _voteDelegationsMaxAmount = 1;
     private _isElectronicVotingEnabled = false;
 
     private _accountId: Id | null = null;
@@ -206,7 +264,11 @@ export class ParticipantCreateWizardComponent extends BaseMeetingComponent imple
 
             this.meetingSettingsService
                 .get(`users_enable_vote_delegations`)
-                .subscribe(enabled => (this._isVoteDelegationEnabled = enabled))
+                .subscribe(enabled => (this._isVoteDelegationEnabled = enabled)),
+
+            this.meetingSettingsService
+                .get(`users_vote_delegations_max_amount`)
+                .subscribe(maxAmount => (this._voteDelegationsMaxAmount = maxAmount ?? 1))
         );
         const urlSegments = this.router.url.split(`/`);
         if (urlSegments.at(-1) === `new`) {
@@ -269,16 +331,13 @@ export class ParticipantCreateWizardComponent extends BaseMeetingComponent imple
         return async () => {
             const payload = {
                 ...this.personalInfoFormValue,
-                vote_delegated_to_ids: this.personalInfoFormValue.vote_delegated_to_ids
-                    ? this.personalInfoFormValue.vote_delegated_to_ids
-                          .filter((id: Id) => !!id)
-                          .map((id: Id) => this.repo.getViewModel(id)?.getMeetingUser()?.id)
-                          .filter((id: Id | undefined) => !!id)
-                    : [],
+                vote_delegated_to_ids: (this.personalInfoFormValue.vote_delegated_to_ids || [])
+                    .filter((id: Id | undefined) => !!id)
+                    .map((id: Id) => this.repo.getViewModel(id).getMeetingUser().id),
                 vote_delegations_from_ids: this.personalInfoFormValue.vote_delegations_from_ids
                     ? this.personalInfoFormValue.vote_delegations_from_ids
-                          .map((id: Id) => this.repo.getViewModel(id).getMeetingUser().id)
                           .filter((id: Id | undefined) => !!id)
+                          .map((id: Id) => this.repo.getViewModel(id).getMeetingUser().id)
                     : []
             };
             if (payload.gender_id === 0) {

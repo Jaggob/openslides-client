@@ -225,6 +225,8 @@
                                         </mat-label>
                                         <os-repo-search-selector
                                             formControlName="vote_delegations_from_ids"
+                                            [disableOptionWhenFn]="isDelegationsFromOptionDisabledFn"
+                                            [disabled]="!canReceiveDelegations"
                                             [multiple]="true"
                                             [repo]="repo"
                                             [sortService]="sortService"
@@ -240,7 +242,9 @@
                                         </mat-label>
                                         <os-repo-search-selector
                                             formControlName="vote_delegated_to_ids"
-                                            [includeNone]="true"
+                                            [disableOptionWhenFn]="isDelegationsToOptionDisabledFn"
+                                            [disabled]="!canDelegateVote"
+                                            [includeNone]="false"
                                             [multiple]="true"
                                             [repo]="repo"
                                             [sortService]="sortService"

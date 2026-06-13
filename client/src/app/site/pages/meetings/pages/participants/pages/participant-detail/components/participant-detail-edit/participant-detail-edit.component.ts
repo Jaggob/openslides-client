@@ -53,8 +53,8 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
         about_me: [``],
         comment: [``],
         group_ids: [``],
-        vote_delegations_from_ids: [``],
-        vote_delegated_to_ids: [``],
+        vote_delegations_from_ids: [[]],
+        vote_delegated_to_ids: [[]],
         is_present: [``],
         locked_out: [``],
         external: [``],
@@ -155,6 +155,68 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
         return this._isVoteDelegationEnabled;
     }
 
+    public get canDelegateVote(): boolean {
+        const delegationFromIds =
+            (this.personalInfoFormValue?.vote_delegations_from_ids as Id[]) ??
+            this.user?.vote_delegations_from_ids(this.activeMeetingId) ??
+            [];
+        return delegationFromIds.length === 0;
+    }
+
+    public get canReceiveDelegations(): boolean {
+        return ((this.personalInfoFormValue?.vote_delegated_to_ids as Id[]) ?? []).length === 0;
+    }
+
+    public readonly isDelegationsToOptionDisabledFn = (user: ViewUser): boolean => {
+        const selectedIds = ((this.personalInfoFormValue?.vote_delegated_to_ids as Id[]) ?? []).filter(id => !!id);
+        if (selectedIds.includes(user.id)) {
+            return false;
+        }
+        const maxAmountReached = selectedIds.length >= this._voteDelegationsMaxAmount && !selectedIds.includes(user.id);
+        const ownMeetingUserId = this.user?.getMeetingUser(this.activeMeetingId)?.id;
+        const targetDelegatedToIds = user.vote_delegated_to_meeting_user_ids(this.activeMeetingId) ?? [];
+        const targetHasIncompatibleDelegation =
+            targetDelegatedToIds.length > 0 &&
+            (ownMeetingUserId === undefined || !targetDelegatedToIds.includes(ownMeetingUserId));
+        return (
+            user.id === this._userId ||
+            maxAmountReached ||
+            targetHasIncompatibleDelegation ||
+            ((this.personalInfoFormValue?.vote_delegations_from_ids as Id[]) ?? []).includes(user.id)
+        );
+    };
+
+    public readonly isDelegationsFromOptionDisabledFn = (user: ViewUser): boolean => {
+        const selectedIds = ((this.personalInfoFormValue?.vote_delegations_from_ids as Id[]) ?? []).filter(id => !!id);
+        if (selectedIds.includes(user.id)) {
+            return false;
+        }
+        const existingDelegatorIds = (this.user?.vote_delegations_from_ids(this.activeMeetingId) ?? []) as Id[];
+        if (!this.canReceiveDelegations || user.id === this._userId) {
+            return true;
+        }
+
+        const canAddReverseDelegations = (this as any).userService ? this.isAllowed(`update`) : true;
+        if (!canAddReverseDelegations) {
+            return !existingDelegatorIds.includes(user.id);
+        }
+
+        const ownMeetingUserId = this.user?.getMeetingUser(this.activeMeetingId)?.id;
+        const targetDelegatedToIds = user.vote_delegated_to_meeting_user_ids(this.activeMeetingId) ?? [];
+        const targetAlreadyDelegatesToCurrent =
+            ownMeetingUserId !== undefined && targetDelegatedToIds.includes(ownMeetingUserId);
+        const targetWouldExceedMaxAmount =
+            !targetAlreadyDelegatesToCurrent && targetDelegatedToIds.length >= this._voteDelegationsMaxAmount;
+        const targetDelegationsFromIds = user.vote_delegations_from_meeting_user_ids(this.activeMeetingId) ?? [];
+        const targetReceivesIncompatibleDelegations =
+            targetDelegationsFromIds.length > 0 &&
+            (ownMeetingUserId === undefined ||
+                targetDelegationsFromIds.length !== 1 ||
+                targetDelegationsFromIds[0] !== ownMeetingUserId);
+
+        return targetWouldExceedMaxAmount || targetReceivesIncompatibleDelegations;
+    };
+
     public get saveButtonEnabled(): boolean {
         return this._userFormLoaded && this.isFormValid && !this.isLockedOutAndCanManage;
     }
@@ -181,6 +243,7 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
     private _userFormLoaded = false;
     private _isVoteWeightEnabled = false;
     private _isVoteDelegationEnabled = false;
+    private _voteDelegationsMaxAmount = 1;
     private _isElectronicVotingEnabled = false;
     private _isDefaultPasswordEditable = false;
     private _isUserEditable = false;
@@ -214,7 +277,11 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
 
             this.meetingSettingsService
                 .get(`users_enable_vote_delegations`)
-                .subscribe(enabled => (this._isVoteDelegationEnabled = enabled))
+                .subscribe(enabled => (this._isVoteDelegationEnabled = enabled)),
+
+            this.meetingSettingsService
+                .get(`users_vote_delegations_max_amount`)
+                .subscribe(maxAmount => (this._voteDelegationsMaxAmount = maxAmount ?? 1))
         );
 
         this.structureLevelObservable = this.structureLevelRepo.getViewModelListObservable();
@@ -314,16 +381,13 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
             const isPresent = this.personalInfoFormValue.is_present || false;
             const payload = {
                 ...this.personalInfoFormValue,
-                vote_delegated_to_ids: this.personalInfoFormValue.vote_delegated_to_ids
-                    ? this.personalInfoFormValue.vote_delegated_to_ids
-                          .filter(id => !!id)
-                          .map(id => this.repo.getViewModel(id)?.getMeetingUser()?.id)
-                          .filter(id => !!id)
-                    : [],
+                vote_delegated_to_ids: (this.personalInfoFormValue.vote_delegated_to_ids || [])
+                    .filter(id => !!id)
+                    .map(id => this.repo.getViewModel(id).getMeetingUser().id),
                 vote_delegations_from_ids: this.personalInfoFormValue.vote_delegations_from_ids
                     ? this.personalInfoFormValue.vote_delegations_from_ids
-                          .map(id => this.repo.getViewModel(id).getMeetingUser().id)
                           .filter(id => !!id)
+                          .map(id => this.repo.getViewModel(id).getMeetingUser().id)
                     : []
             };
             if (payload.member_number === ``) {

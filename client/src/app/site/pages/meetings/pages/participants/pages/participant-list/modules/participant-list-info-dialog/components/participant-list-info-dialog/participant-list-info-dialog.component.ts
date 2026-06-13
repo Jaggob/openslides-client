@@ -39,6 +39,14 @@ export class ParticipantListInfoDialogComponent extends BaseUiComponent implemen
         return this._voteDelegationEnabled;
     }
 
+    public get canDelegateVote(): boolean {
+        return (this.infoDialog.vote_delegations_from_ids ?? []).length === 0;
+    }
+
+    public get canReceiveDelegations(): boolean {
+        return (this.infoDialog.vote_delegated_to_ids ?? []).length === 0;
+    }
+
     public get canOnlyEditOwnDelegation(): boolean {
         return (
             this.operator.hasPerms(Permission.userCanEditOwnDelegation) &&
@@ -52,6 +60,7 @@ export class ParticipantListInfoDialogComponent extends BaseUiComponent implemen
     private readonly _otherParticipantsSubject = new BehaviorSubject<ViewMeetingUser[]>([]);
     private _currentUser: ViewUser | null = null;
     private _voteDelegationEnabled = false;
+    private _voteDelegationsMaxAmount = 1;
 
     public constructor(
         @Inject(MAT_DIALOG_DATA) public readonly infoDialog: InfoDialog,
@@ -81,7 +90,10 @@ export class ParticipantListInfoDialogComponent extends BaseUiComponent implemen
                 ),
             this.meetingSettings
                 .get(`users_enable_vote_delegations`)
-                .subscribe(enabled => (this._voteDelegationEnabled = enabled))
+                .subscribe(enabled => (this._voteDelegationEnabled = enabled)),
+            this.meetingSettings
+                .get(`users_vote_delegations_max_amount`)
+                .subscribe(maxAmount => (this._voteDelegationsMaxAmount = maxAmount ?? 1))
         );
     }
 
@@ -90,13 +102,56 @@ export class ParticipantListInfoDialogComponent extends BaseUiComponent implemen
         super.ngOnDestroy();
     }
 
-    public getDisableOptionFn(vote_delegations: number[]): (value: Selectable) => boolean {
-        if (this.canOnlyEditOwnDelegation) {
-            return value => {
-                return vote_delegations ? !vote_delegations.some(x => x === value.id) : true;
-            };
-        } else {
-            return _ => false;
+    public readonly isDelegationsFromOptionDisabledFn = (value: Selectable): boolean => {
+        const selectedIds = (this.infoDialog.vote_delegations_from_ids ?? []).filter(id => !!id);
+        if (selectedIds.includes(value.id)) {
+            return false;
         }
-    }
+        if (
+            this.canOnlyEditOwnDelegation ||
+            !this.canReceiveDelegations ||
+            value.id === this._currentUser?.getMeetingUser()?.id
+        ) {
+            return true;
+        }
+
+        const meetingUser = value as ViewMeetingUser;
+        const ownMeetingUserId = this._currentUser?.getMeetingUser()?.id;
+        const targetDelegatedToIds = meetingUser.vote_delegated_to_ids ?? [];
+        const targetAlreadyDelegatesToCurrent =
+            ownMeetingUserId !== undefined && targetDelegatedToIds.includes(ownMeetingUserId);
+        const targetWouldExceedMaxAmount =
+            !targetAlreadyDelegatesToCurrent && targetDelegatedToIds.length >= this._voteDelegationsMaxAmount;
+        const targetDelegationsFromIds = meetingUser.vote_delegations_from_ids ?? [];
+        const targetReceivesIncompatibleDelegations =
+            targetDelegationsFromIds.length > 0 &&
+            (ownMeetingUserId === undefined ||
+                targetDelegationsFromIds.length !== 1 ||
+                targetDelegationsFromIds[0] !== ownMeetingUserId);
+
+        return targetWouldExceedMaxAmount || targetReceivesIncompatibleDelegations;
+    };
+
+    public readonly isDelegationsToOptionDisabledFn = (value: Selectable): boolean => {
+        const meetingUser = value as ViewMeetingUser;
+        const selectedIds = (this.infoDialog.vote_delegated_to_ids ?? []).filter(id => !!id);
+        if (selectedIds.includes(value.id)) {
+            return false;
+        }
+        if (!this.canDelegateVote || value.id === this._currentUser?.getMeetingUser()?.id) {
+            return true;
+        }
+        const maxAmountReached =
+            selectedIds.length >= this._voteDelegationsMaxAmount && !selectedIds.includes(value.id);
+        const ownMeetingUserId = this._currentUser?.getMeetingUser()?.id;
+        const targetDelegatedToIds = meetingUser.vote_delegated_to_ids ?? [];
+        const targetHasIncompatibleDelegation =
+            targetDelegatedToIds.length > 0 &&
+            (ownMeetingUserId === undefined || !targetDelegatedToIds.includes(ownMeetingUserId));
+        return (
+            maxAmountReached ||
+            (this.infoDialog.vote_delegations_from_ids ?? []).includes(value.id) ||
+            targetHasIncompatibleDelegation
+        );
+    };
 }
