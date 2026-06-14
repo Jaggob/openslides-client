@@ -167,7 +167,13 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
         return ((this.personalInfoFormValue?.vote_delegated_to_ids as Id[]) ?? []).length === 0;
     }
 
-    public readonly isDelegationsToOptionDisabledFn = (user: ViewUser): boolean => {
+    public readonly isDelegationsToOptionDisabledFn = (user: ViewUser): boolean =>
+        this.isDelegationsToOptionDisabled(user);
+
+    public readonly isDelegationsFromOptionDisabledFn = (user: ViewUser): boolean =>
+        this.isDelegationsFromOptionDisabled(user);
+
+    public isDelegationsToOptionDisabled(user: ViewUser): boolean {
         const selectedIds = ((this.personalInfoFormValue?.vote_delegated_to_ids as Id[]) ?? []).filter(id => !!id);
         if (selectedIds.includes(user.id)) {
             return false;
@@ -184,9 +190,9 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
             targetHasIncompatibleDelegation ||
             ((this.personalInfoFormValue?.vote_delegations_from_ids as Id[]) ?? []).includes(user.id)
         );
-    };
+    }
 
-    public readonly isDelegationsFromOptionDisabledFn = (user: ViewUser): boolean => {
+    public isDelegationsFromOptionDisabled(user: ViewUser): boolean {
         const selectedIds = ((this.personalInfoFormValue?.vote_delegations_from_ids as Id[]) ?? []).filter(id => !!id);
         if (selectedIds.includes(user.id)) {
             return false;
@@ -215,7 +221,7 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
                 targetDelegationsFromIds[0] !== ownMeetingUserId);
 
         return targetWouldExceedMaxAmount || targetReceivesIncompatibleDelegations;
-    };
+    }
 
     public get saveButtonEnabled(): boolean {
         return this._userFormLoaded && this.isFormValid && !this.isLockedOutAndCanManage;

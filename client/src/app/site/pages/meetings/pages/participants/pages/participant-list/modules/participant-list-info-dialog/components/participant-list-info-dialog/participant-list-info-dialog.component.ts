@@ -102,7 +102,13 @@ export class ParticipantListInfoDialogComponent extends BaseUiComponent implemen
         super.ngOnDestroy();
     }
 
-    public readonly isDelegationsFromOptionDisabledFn = (value: Selectable): boolean => {
+    public readonly isDelegationsFromOptionDisabledFn = (value: Selectable): boolean =>
+        this.isDelegationsFromOptionDisabled(value);
+
+    public readonly isDelegationsToOptionDisabledFn = (value: Selectable): boolean =>
+        this.isDelegationsToOptionDisabled(value);
+
+    public isDelegationsFromOptionDisabled(value: Selectable): boolean {
         const selectedIds = (this.infoDialog.vote_delegations_from_ids ?? []).filter(id => !!id);
         if (selectedIds.includes(value.id)) {
             return false;
@@ -130,9 +136,9 @@ export class ParticipantListInfoDialogComponent extends BaseUiComponent implemen
                 targetDelegationsFromIds[0] !== ownMeetingUserId);
 
         return targetWouldExceedMaxAmount || targetReceivesIncompatibleDelegations;
-    };
+    }
 
-    public readonly isDelegationsToOptionDisabledFn = (value: Selectable): boolean => {
+    public isDelegationsToOptionDisabled(value: Selectable): boolean {
         const meetingUser = value as ViewMeetingUser;
         const selectedIds = (this.infoDialog.vote_delegated_to_ids ?? []).filter(id => !!id);
         if (selectedIds.includes(value.id)) {
@@ -153,5 +159,5 @@ export class ParticipantListInfoDialogComponent extends BaseUiComponent implemen
             (this.infoDialog.vote_delegations_from_ids ?? []).includes(value.id) ||
             targetHasIncompatibleDelegation
         );
-    };
+    }
 }

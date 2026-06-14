@@ -47,7 +47,7 @@ describe(`ParticipantDetailEditComponent delegation selector rules`, () => {
             vote_delegated_to_meeting_user_ids: () => []
         } as any;
 
-        expect(component.isDelegationsToOptionDisabledFn(user)).toBeTrue();
+        expect(component.isDelegationsToOptionDisabled(user)).toBeTrue();
     });
 
     it(`disables additional delegates after the configured maximum is reached`, () => {
@@ -62,8 +62,8 @@ describe(`ParticipantDetailEditComponent delegation selector rules`, () => {
             vote_delegated_to_meeting_user_ids: () => []
         } as any;
 
-        expect(component.isDelegationsToOptionDisabledFn(selectedUser)).toBeFalse();
-        expect(component.isDelegationsToOptionDisabledFn(additionalUser)).toBeTrue();
+        expect(component.isDelegationsToOptionDisabled(selectedUser)).toBeFalse();
+        expect(component.isDelegationsToOptionDisabled(additionalUser)).toBeTrue();
     });
 
     it(`allows reversing an existing delegation if the target delegates to the current user`, () => {
@@ -73,7 +73,7 @@ describe(`ParticipantDetailEditComponent delegation selector rules`, () => {
             vote_delegated_to_meeting_user_ids: () => [100]
         } as any;
 
-        expect(component.isDelegationsToOptionDisabledFn(user)).toBeFalse();
+        expect(component.isDelegationsToOptionDisabled(user)).toBeFalse();
     });
 
     it(`disables targets with incompatible existing delegations`, () => {
@@ -83,7 +83,7 @@ describe(`ParticipantDetailEditComponent delegation selector rules`, () => {
             vote_delegated_to_meeting_user_ids: () => [200]
         } as any;
 
-        expect(component.isDelegationsToOptionDisabledFn(user)).toBeTrue();
+        expect(component.isDelegationsToOptionDisabled(user)).toBeTrue();
     });
 
     it(`disables delegates that are already selected as principals`, () => {
@@ -94,7 +94,7 @@ describe(`ParticipantDetailEditComponent delegation selector rules`, () => {
             vote_delegated_to_meeting_user_ids: () => []
         } as any;
 
-        expect(component.isDelegationsToOptionDisabledFn(user)).toBeTrue();
+        expect(component.isDelegationsToOptionDisabled(user)).toBeTrue();
     });
 
     it(`disables principals that would exceed their delegation limit`, () => {
@@ -105,7 +105,7 @@ describe(`ParticipantDetailEditComponent delegation selector rules`, () => {
             vote_delegations_from_meeting_user_ids: () => []
         } as any;
 
-        expect(component.isDelegationsFromOptionDisabledFn(user)).toBeTrue();
+        expect(component.isDelegationsFromOptionDisabled(user)).toBeTrue();
     });
 
     it(`disables principals that receive incompatible delegations`, () => {
@@ -116,7 +116,7 @@ describe(`ParticipantDetailEditComponent delegation selector rules`, () => {
             vote_delegations_from_meeting_user_ids: () => [200]
         } as any;
 
-        expect(component.isDelegationsFromOptionDisabledFn(user)).toBeTrue();
+        expect(component.isDelegationsFromOptionDisabled(user)).toBeTrue();
     });
 
     it(`allows selected principals so they can be removed`, () => {
@@ -128,6 +128,6 @@ describe(`ParticipantDetailEditComponent delegation selector rules`, () => {
             vote_delegations_from_meeting_user_ids: () => [200]
         } as any;
 
-        expect(component.isDelegationsFromOptionDisabledFn(user)).toBeFalse();
+        expect(component.isDelegationsFromOptionDisabled(user)).toBeFalse();
     });
 });

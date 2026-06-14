@@ -47,8 +47,8 @@ describe(`ParticipantCreateWizardComponent delegation selector rules`, () => {
             vote_delegated_to_meeting_user_ids: () => []
         } as any;
 
-        expect(component.isDelegationsToOptionDisabledFn(selectedUser)).toBeFalse();
-        expect(component.isDelegationsToOptionDisabledFn(additionalUser)).toBeTrue();
+        expect(component.isDelegationsToOptionDisabled(selectedUser)).toBeFalse();
+        expect(component.isDelegationsToOptionDisabled(additionalUser)).toBeTrue();
     });
 
     it(`disables targets that already delegate their own vote`, () => {
@@ -58,7 +58,7 @@ describe(`ParticipantCreateWizardComponent delegation selector rules`, () => {
             vote_delegated_to_meeting_user_ids: () => [100]
         } as any;
 
-        expect(component.isDelegationsToOptionDisabledFn(user)).toBeTrue();
+        expect(component.isDelegationsToOptionDisabled(user)).toBeTrue();
     });
 
     it(`disables targets that are already selected as principals`, () => {
@@ -69,7 +69,7 @@ describe(`ParticipantCreateWizardComponent delegation selector rules`, () => {
             vote_delegated_to_meeting_user_ids: () => []
         } as any;
 
-        expect(component.isDelegationsToOptionDisabledFn(user)).toBeTrue();
+        expect(component.isDelegationsToOptionDisabled(user)).toBeTrue();
     });
 
     it(`disables principals that would exceed their delegation limit`, () => {
@@ -80,7 +80,7 @@ describe(`ParticipantCreateWizardComponent delegation selector rules`, () => {
             vote_delegations_from_meeting_user_ids: () => []
         } as any;
 
-        expect(component.isDelegationsFromOptionDisabledFn(user)).toBeTrue();
+        expect(component.isDelegationsFromOptionDisabled(user)).toBeTrue();
     });
 
     it(`disables principals that receive delegations themselves`, () => {
@@ -91,7 +91,7 @@ describe(`ParticipantCreateWizardComponent delegation selector rules`, () => {
             vote_delegations_from_meeting_user_ids: () => [100]
         } as any;
 
-        expect(component.isDelegationsFromOptionDisabledFn(user)).toBeTrue();
+        expect(component.isDelegationsFromOptionDisabled(user)).toBeTrue();
     });
 
     it(`allows selected principals so they can be removed`, () => {
@@ -103,6 +103,6 @@ describe(`ParticipantCreateWizardComponent delegation selector rules`, () => {
             vote_delegations_from_meeting_user_ids: () => [100]
         } as any;
 
-        expect(component.isDelegationsFromOptionDisabledFn(user)).toBeFalse();
+        expect(component.isDelegationsFromOptionDisabled(user)).toBeFalse();
     });
 });

@@ -149,7 +149,13 @@ export class ParticipantCreateWizardComponent extends BaseMeetingComponent imple
         return ((this.personalInfoFormValue?.vote_delegated_to_ids as Id[]) ?? []).length === 0;
     }
 
-    public readonly isDelegationsToOptionDisabledFn = (user: ViewUser): boolean => {
+    public readonly isDelegationsToOptionDisabledFn = (user: ViewUser): boolean =>
+        this.isDelegationsToOptionDisabled(user);
+
+    public readonly isDelegationsFromOptionDisabledFn = (user: ViewUser): boolean =>
+        this.isDelegationsFromOptionDisabled(user);
+
+    public isDelegationsToOptionDisabled(user: ViewUser): boolean {
         const selectedIds = ((this.personalInfoFormValue?.vote_delegated_to_ids as Id[]) ?? []).filter(id => !!id);
         if (selectedIds.includes(user.id)) {
             return false;
@@ -167,9 +173,9 @@ export class ParticipantCreateWizardComponent extends BaseMeetingComponent imple
             targetHasIncompatibleDelegation ||
             ((this.personalInfoFormValue?.vote_delegations_from_ids as Id[]) ?? []).includes(user.id)
         );
-    };
+    }
 
-    public readonly isDelegationsFromOptionDisabledFn = (user: ViewUser): boolean => {
+    public isDelegationsFromOptionDisabled(user: ViewUser): boolean {
         const selectedIds = ((this.personalInfoFormValue?.vote_delegations_from_ids as Id[]) ?? []).filter(id => !!id);
         if (selectedIds.includes(user.id)) {
             return false;
@@ -192,7 +198,7 @@ export class ParticipantCreateWizardComponent extends BaseMeetingComponent imple
                 targetDelegationsFromIds[0] !== ownMeetingUserId);
 
         return targetWouldExceedMaxAmount || targetReceivesIncompatibleDelegations;
-    };
+    }
 
     public sortFn = (groupA: ViewGroup, groupB: ViewGroup): number => groupA.weight - groupB.weight;
 
