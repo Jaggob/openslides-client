@@ -152,7 +152,9 @@
                     matTooltip="{{ 'Voting right delegated to (proxy)' | translate }}"
                     matTooltipPosition="left"
                 >
-                    <os-icon-container icon="forward" [noWrap]="true">{{ user.vote_delegated_to_names() }}</os-icon-container>
+                    <os-icon-container icon="forward" [noWrap]="true">
+                        {{ user.vote_delegated_to_names() }}
+                    </os-icon-container>
                 </div>
             }
             @if (user.vote_delegations_from_ids()?.length && voteDelegationEnabled) {
