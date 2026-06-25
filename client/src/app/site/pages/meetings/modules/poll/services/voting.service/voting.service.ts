@@ -112,6 +112,9 @@ export class VotingService {
      * checks whether the operator can vote on the given poll
      */
     public votingProhibited(poll: ViewPoll, user?: ViewUser): Observable<VotingProhibition | null> {
+        if (!user) {
+            return of(null);
+        }
         const representedMeetingUserId = this.representedMeetingUserId(user);
         return combineLatest([
             this.userRepo.getViewModelObservable(user.id),

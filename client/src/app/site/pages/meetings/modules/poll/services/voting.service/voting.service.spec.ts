@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom, of } from 'rxjs';
 
-import { VotingService } from './voting.service';
+import { VotingProhibition, VotingService } from './voting.service';
 
 xdescribe(`VotingService`, () => {
     let service: VotingService;
@@ -123,5 +123,30 @@ describe(`VotingService.hasVoted`, () => {
 
         expect(await firstValueFrom(service.hasVoted(poll, userWithoutMeetingUser))).toBeFalse();
         expect(pollBallotsByUser).not.toHaveBeenCalled();
+    });
+});
+
+describe(`VotingService.votingProhibited`, () => {
+    const MEETING_ID = 7;
+    const REPRESENTED_MEETING_USER_ID = 110;
+
+    const poll = { id: 1 } as any;
+    // The user id and the meeting_user id deliberately differ.
+    const user = { id: 10, getMeetingUser: () => ({ id: REPRESENTED_MEETING_USER_ID }) } as any;
+
+    it(`looks the ballot up by the represented meeting_user id and reports USER_HAS_VOTED`, async () => {
+        const pollBallotsByUser = jasmine
+            .createSpy(`pollBallotsByUser`)
+            .and.returnValue(of([{ acting_meeting_user_id: 50 }]));
+        const service = Object.create(VotingService.prototype) as VotingService;
+        (service as any).activeMeetingService = { meetingId: MEETING_ID };
+        (service as any).operator = { isAnonymous: false };
+        (service as any).userRepo = { getViewModelObservable: () => of(user) };
+        (service as any).pollRepo = { getViewModelObservable: () => of(poll), pollBallotsByUser };
+
+        const result = await firstValueFrom(service.votingProhibited(poll, user));
+
+        expect(pollBallotsByUser).toHaveBeenCalledWith(poll.id, REPRESENTED_MEETING_USER_ID);
+        expect(result).toBe(VotingProhibition.USER_HAS_VOTED);
     });
 });
