@@ -160,7 +160,7 @@ export class ParticipantCreateWizardComponent extends BaseMeetingComponent imple
         if (selectedIds.includes(user.id)) {
             return false;
         }
-        const maxAmountReached = selectedIds.length >= this._voteDelegationsMaxAmount && !selectedIds.includes(user.id);
+        const maxAmountReached = selectedIds.length >= this._voteDelegationsMaxAmount;
         const ownMeetingUserId = this.getAccountMeetingUserId();
         const targetDelegatedToIds = user.vote_delegated_to_meeting_user_ids(this.activeMeetingId) ?? [];
         const targetHasIncompatibleDelegation =

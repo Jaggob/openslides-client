@@ -178,7 +178,7 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
         if (selectedIds.includes(user.id)) {
             return false;
         }
-        const maxAmountReached = selectedIds.length >= this._voteDelegationsMaxAmount && !selectedIds.includes(user.id);
+        const maxAmountReached = selectedIds.length >= this._voteDelegationsMaxAmount;
         const ownMeetingUserId = this.user?.getMeetingUser(this.activeMeetingId)?.id;
         const targetDelegatedToIds = user.vote_delegated_to_meeting_user_ids(this.activeMeetingId) ?? [];
         const targetHasIncompatibleDelegation =

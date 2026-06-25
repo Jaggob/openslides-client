@@ -147,8 +147,7 @@ export class ParticipantListInfoDialogComponent extends BaseUiComponent implemen
         if (!this.canDelegateVote || value.id === this._currentUser?.getMeetingUser()?.id) {
             return true;
         }
-        const maxAmountReached =
-            selectedIds.length >= this._voteDelegationsMaxAmount && !selectedIds.includes(value.id);
+        const maxAmountReached = selectedIds.length >= this._voteDelegationsMaxAmount;
         const ownMeetingUserId = this._currentUser?.getMeetingUser()?.id;
         const targetDelegatedToIds = meetingUser.vote_delegated_to_ids ?? [];
         const targetHasIncompatibleDelegation =

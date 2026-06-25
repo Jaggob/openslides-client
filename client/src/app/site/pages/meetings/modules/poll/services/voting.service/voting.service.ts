@@ -75,6 +75,9 @@ export class VotingService {
      * can see which one of them already voted. Returns null if nobody voted yet.
      */
     public votedBy(poll: ViewPoll, user?: ViewUser): Observable<ViewUser | null> {
+        if (!user) {
+            return of(null);
+        }
         return this.pollRepo.pollBallotsByUser(poll.id, user.id).pipe(
             map(ballots => ballots[0]?.acting_meeting_user_id ?? null),
             distinctUntilChanged(),
