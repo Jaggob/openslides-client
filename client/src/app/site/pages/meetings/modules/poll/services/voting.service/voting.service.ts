@@ -73,12 +73,19 @@ export class VotingService {
      * represented user. This is visible to the represented user and to all of
      * their delegates (restriction mode C of poll_ballot), so the other proxies
      * can see which one of them already voted. Returns null if nobody voted yet.
+     *
+     * `poll_ballot` is keyed by the *meeting_user* id, so look up the represented
+     * user's meeting_user (not the user id). NOTE: the surrounding "Voting
+     * successful" / "Voted by" UI is gated by hasVoted / votingProhibited, whose
+     * delegation-aware ballot lookup is still WIP upstream (see the TODO in this
+     * file); the hint becomes reliably visible once that lands.
      */
     public votedBy(poll: ViewPoll, user?: ViewUser): Observable<ViewUser | null> {
-        if (!user) {
+        const representedMeetingUserId = user?.getMeetingUser(this.activeMeetingService.meetingId)?.id;
+        if (!representedMeetingUserId) {
             return of(null);
         }
-        return this.pollRepo.pollBallotsByUser(poll.id, user.id).pipe(
+        return this.pollRepo.pollBallotsByUser(poll.id, representedMeetingUserId).pipe(
             map(ballots => ballots[0]?.acting_meeting_user_id ?? null),
             distinctUntilChanged(),
             switchMap(actingMeetingUserId =>
