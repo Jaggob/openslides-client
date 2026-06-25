@@ -357,7 +357,9 @@ export abstract class BasePollDetailComponent<V extends PollContentObject, S ext
 
     public getUsersVoteDelegation(user: ViewUser): ViewUser | null {
         if (user.isVoteRightDelegated) {
-            return user.vote_delegated_to_users(this.activeMeetingId!)?.[0] ?? null;
+            // This legacy single-delegate view only shows the first proxy; the
+            // full list is available via vote_delegated_to_users().
+            return user.vote_delegated_to_users(this.activeMeetingId!)[0] ?? null;
         }
 
         if (this._currentOperator.canVoteFor(user)) {

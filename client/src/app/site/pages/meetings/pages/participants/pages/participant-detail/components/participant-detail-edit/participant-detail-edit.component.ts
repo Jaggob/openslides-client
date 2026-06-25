@@ -202,7 +202,7 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
             return true;
         }
 
-        const canAddReverseDelegations = (this as any).userService ? this.isAllowed(`update`) : true;
+        const canAddReverseDelegations = this.isAllowed(`update`);
         if (!canAddReverseDelegations) {
             return !existingDelegatorIds.includes(user.id);
         }

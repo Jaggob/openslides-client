@@ -37,6 +37,7 @@ describe(`ParticipantDetailEditComponent delegation selector rules`, () => {
             getMeetingUser: () => ({ id: 100 }),
             vote_delegations_from_ids: () => []
         };
+        (component as any).userService = { isAllowed: () => true };
         return component;
     }
 

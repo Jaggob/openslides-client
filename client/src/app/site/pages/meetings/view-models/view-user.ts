@@ -235,6 +235,15 @@ export class ViewUser extends BaseViewModel<User> /* implements Searchable */ {
         return this.getMeetingUser(meetingId)?.chat_message_ids;
     }
 
+    /**
+     * The meeting users this user has delegated their vote to.
+     *
+     * Note on the id space of the accessors below: `*_meeting_user(s)`/
+     * `*_meeting_user_ids` operate on `meeting_user` ids (the relation stored on
+     * the model), while `vote_delegated_to_users`/`vote_delegated_to_ids` resolve
+     * to the underlying `user` ids. The latter share the name of the model field
+     * `meeting_user/vote_delegated_to_ids` but intentionally return user ids.
+     */
     public vote_delegated_to_meeting_users(meetingId?: Id): ViewMeetingUser[] {
         return this.getMeetingUser(meetingId)?.vote_delegated_to ?? [];
     }
@@ -245,10 +254,12 @@ export class ViewUser extends BaseViewModel<User> /* implements Searchable */ {
             .filter(user => !!user);
     }
 
+    /** User ids (not meeting_user ids) this user delegated their vote to. */
     public vote_delegated_to_ids(meetingId?: Id): Id[] {
         return this.vote_delegated_to_users(meetingId).map(user => user.id);
     }
 
+    /** Meeting_user ids (the raw model relation) this user delegated their vote to. */
     public vote_delegated_to_meeting_user_ids(meetingId?: Id): Id[] {
         return this.getMeetingUser(meetingId)?.vote_delegated_to_ids ?? [];
     }
