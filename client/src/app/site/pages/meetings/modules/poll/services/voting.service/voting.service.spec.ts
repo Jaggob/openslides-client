@@ -80,3 +80,48 @@ describe(`VotingService.votedBy`, () => {
         expect(pollBallotsByUser).not.toHaveBeenCalled();
     });
 });
+
+describe(`VotingService.hasVoted`, () => {
+    const MEETING_ID = 7;
+    const REPRESENTED_MEETING_USER_ID = 110;
+
+    function createService(ballots: any[]): { service: VotingService; pollBallotsByUser: jasmine.Spy } {
+        const pollBallotsByUser = jasmine.createSpy(`pollBallotsByUser`).and.returnValue(of(ballots));
+        const service = Object.create(VotingService.prototype) as VotingService;
+        (service as any).activeMeetingService = { meetingId: MEETING_ID };
+        (service as any).pollRepo = { pollBallotsByUser };
+        return { service, pollBallotsByUser };
+    }
+
+    const poll = { id: 1 } as any;
+    // The user id and the meeting_user id deliberately differ.
+    const user = { id: 10, getMeetingUser: () => ({ id: REPRESENTED_MEETING_USER_ID }) } as any;
+
+    it(`looks the ballot up by the represented meeting_user id, not the user id`, async () => {
+        const { service, pollBallotsByUser } = createService([]);
+
+        await firstValueFrom(service.hasVoted(poll, user));
+
+        expect(pollBallotsByUser).toHaveBeenCalledWith(poll.id, REPRESENTED_MEETING_USER_ID);
+    });
+
+    it(`is true when a ballot exists`, async () => {
+        const { service } = createService([{ acting_meeting_user_id: 50 }]);
+
+        expect(await firstValueFrom(service.hasVoted(poll, user))).toBeTrue();
+    });
+
+    it(`is false when no ballot exists`, async () => {
+        const { service } = createService([]);
+
+        expect(await firstValueFrom(service.hasVoted(poll, user))).toBeFalse();
+    });
+
+    it(`is false without a repository lookup when the user has no meeting_user`, async () => {
+        const { service, pollBallotsByUser } = createService([{ acting_meeting_user_id: 50 }]);
+        const userWithoutMeetingUser = { id: 10, getMeetingUser: () => undefined } as any;
+
+        expect(await firstValueFrom(service.hasVoted(poll, userWithoutMeetingUser))).toBeFalse();
+        expect(pollBallotsByUser).not.toHaveBeenCalled();
+    });
+});

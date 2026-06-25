@@ -62,10 +62,26 @@ export class VotingService {
     }
 
     /**
+     * poll_ballot is keyed by the represented meeting_user, not the user, so the
+     * "already voted" / "voted by" lookups must resolve the represented user's
+     * meeting_user id in the active meeting (the two only coincide in freshly
+     * seeded data).
+     */
+    private representedMeetingUserId(user?: ViewUser): number | undefined {
+        return user?.getMeetingUser(this.activeMeetingService.meetingId)?.id;
+    }
+
+    /**
      * checks whether the operator can vote on the given poll
      */
     public hasVoted(poll: ViewPoll, user?: ViewUser): Observable<boolean> {
-        return this.pollRepo.pollBallotsByUser(poll.id, user.id).pipe(map(ballots => !!ballots.length));
+        const representedMeetingUserId = this.representedMeetingUserId(user);
+        if (!representedMeetingUserId) {
+            return of(false);
+        }
+        return this.pollRepo
+            .pollBallotsByUser(poll.id, representedMeetingUserId)
+            .pipe(map(ballots => !!ballots.length));
     }
 
     /**
@@ -73,15 +89,9 @@ export class VotingService {
      * represented user. This is visible to the represented user and to all of
      * their delegates (restriction mode C of poll_ballot), so the other proxies
      * can see which one of them already voted. Returns null if nobody voted yet.
-     *
-     * `poll_ballot` is keyed by the *meeting_user* id, so look up the represented
-     * user's meeting_user (not the user id). NOTE: the surrounding "Voting
-     * successful" / "Voted by" UI is gated by hasVoted / votingProhibited, whose
-     * delegation-aware ballot lookup is still WIP upstream (see the TODO in this
-     * file); the hint becomes reliably visible once that lands.
      */
     public votedBy(poll: ViewPoll, user?: ViewUser): Observable<ViewUser | null> {
-        const representedMeetingUserId = user?.getMeetingUser(this.activeMeetingService.meetingId)?.id;
+        const representedMeetingUserId = this.representedMeetingUserId(user);
         if (!representedMeetingUserId) {
             return of(null);
         }
@@ -102,10 +112,11 @@ export class VotingService {
      * checks whether the operator can vote on the given poll
      */
     public votingProhibited(poll: ViewPoll, user?: ViewUser): Observable<VotingProhibition | null> {
+        const representedMeetingUserId = this.representedMeetingUserId(user);
         return combineLatest([
             this.userRepo.getViewModelObservable(user.id),
             this.pollRepo.getViewModelObservable(poll.id),
-            this.pollRepo.pollBallotsByUser(poll.id, user.id)
+            representedMeetingUserId ? this.pollRepo.pollBallotsByUser(poll.id, representedMeetingUserId) : of([])
         ]).pipe(
             map(([user, poll, ballots]) => {
                 return this.getVotingProhibitionReason(poll, user, ballots);
