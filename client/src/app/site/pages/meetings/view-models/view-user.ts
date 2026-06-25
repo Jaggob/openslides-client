@@ -270,6 +270,12 @@ export class ViewUser extends BaseViewModel<User> /* implements Searchable */ {
             .join(`, `);
     }
 
+    public vote_delegated_to_short_names(meetingId?: Id): string {
+        return this.vote_delegated_to_users(meetingId)
+            .map(user => user.getShortName().trim())
+            .join(`, `);
+    }
+
     public vote_delegations_from_ids(meetingId?: Id): Id[] {
         return this.getMeetingUser(meetingId)?.vote_delegations_from?.map(meeting_user => meeting_user?.user_id);
     }

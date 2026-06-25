@@ -24,11 +24,11 @@
                             <div>{{ 'Vote weight' | translate }}: {{ vote.user.vote_weight() }}</div>
                         }
                         <!-- Delegation -->
-                        @if (delegationEnabled() && vote.user.vote_delegated_to_names()) {
+                        @if (delegationEnabled() && vote.user.vote_delegated_to_short_names()) {
                             <div>
                                 <span>({{ 'represented by' | translate }}</span>
                                 &nbsp;
-                                <span>{{ vote.user.vote_delegated_to_names() }})</span>
+                                <span>{{ vote.user.vote_delegated_to_short_names() }})</span>
                             </div>
                         }
                     </div>
