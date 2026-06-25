@@ -5,6 +5,12 @@
             <mat-icon class="vote-submitted">check_circle</mat-icon>
             <br />
             <span>{{ 'Voting successful.' | translate }}</span>
+            @if (votedBy.value(); as actor) {
+                @if (actor.id !== user().id) {
+                    <br />
+                    <span class="voted-by-hint">{{ 'Voted by' | translate }} {{ actor.getShortName() }}</span>
+                }
+            }
         </div>
     } @else if (isDeliveringVote()) {
         <!-- Delivering -->

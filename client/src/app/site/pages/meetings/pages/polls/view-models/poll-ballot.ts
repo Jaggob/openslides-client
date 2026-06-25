@@ -28,6 +28,7 @@ interface IViewPollBallotRelations {
     poll: ViewPoll;
     user?: ViewUser;
     delegated_user?: ViewMeetingUser;
+    acting_meeting_user?: ViewMeetingUser;
 }
 
 export interface ViewPollBallot extends HasMeeting, ViewModelRelations<IViewPollBallotRelations>, PollBallot {}

@@ -48,6 +48,11 @@ export class PollCannotVoteMessageComponent extends BaseMeetingComponent {
         stream: ({ params }) => this.votingService.hasVoted(params.poll, params.user)
     });
 
+    public votedBy = rxResource({
+        params: () => ({ poll: this.poll(), user: this.user() }),
+        stream: ({ params }) => this.votingService.votedBy(params.poll, params.user)
+    });
+
     public getVotingErrorFromName(errorName: VotingProhibition): string {
         return this.votingService.getVotingProhibitionReasonVerboseFromName(errorName) || ``;
     }

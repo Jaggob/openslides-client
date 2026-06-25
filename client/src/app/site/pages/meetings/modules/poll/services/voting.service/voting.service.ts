@@ -1,7 +1,8 @@
 import { inject, Injectable } from '@angular/core';
 import { _ } from '@ngx-translate/core';
-import { combineLatest, map, Observable } from 'rxjs';
+import { combineLatest, distinctUntilChanged, map, Observable, of, switchMap } from 'rxjs';
 import { PollState } from 'src/app/domain/models/poll/poll-constants';
+import { MeetingUserRepositoryService } from 'src/app/gateways/repositories/meeting_user/meeting-user-repository.service';
 import { PollRepositoryService } from 'src/app/gateways/repositories/polls/poll-repository.service';
 import { ViewPoll, ViewPollBallot } from 'src/app/site/pages/meetings/pages/polls';
 import { ViewUser } from 'src/app/site/pages/meetings/view-models/view-user';
@@ -44,6 +45,7 @@ export class VotingService {
 
     private userRepo = inject(UserControllerService);
     private pollRepo = inject(PollRepositoryService);
+    private meetingUserRepo = inject(MeetingUserRepositoryService);
 
     public constructor(
         private activeMeetingService: ActiveMeetingService,
@@ -64,6 +66,26 @@ export class VotingService {
      */
     public hasVoted(poll: ViewPoll, user?: ViewUser): Observable<boolean> {
         return this.pollRepo.pollBallotsByUser(poll.id, user.id).pipe(map(ballots => !!ballots.length));
+    }
+
+    /**
+     * Resolves who actually cast the (already submitted) ballot for the given
+     * represented user. This is visible to the represented user and to all of
+     * their delegates (restriction mode C of poll_ballot), so the other proxies
+     * can see which one of them already voted. Returns null if nobody voted yet.
+     */
+    public votedBy(poll: ViewPoll, user?: ViewUser): Observable<ViewUser | null> {
+        return this.pollRepo.pollBallotsByUser(poll.id, user.id).pipe(
+            map(ballots => ballots[0]?.acting_meeting_user_id ?? null),
+            distinctUntilChanged(),
+            switchMap(actingMeetingUserId =>
+                actingMeetingUserId
+                    ? this.meetingUserRepo
+                          .getViewModelObservable(actingMeetingUserId)
+                          .pipe(map(meetingUser => meetingUser?.user ?? null))
+                    : of(null)
+            )
+        );
     }
 
     /**
