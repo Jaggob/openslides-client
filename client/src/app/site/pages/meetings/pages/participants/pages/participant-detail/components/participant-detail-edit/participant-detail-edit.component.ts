@@ -14,6 +14,11 @@ import {
     MEETING_RELATED_FORM_CONTROLS,
     ParticipantControllerService
 } from 'src/app/site/pages/meetings/pages/participants/services/common/participant-controller.service';
+import {
+    targetHasIncompatibleOutgoingDelegation,
+    targetReceivesIncompatibleDelegations,
+    targetWouldExceedMaxAmount
+} from 'src/app/site/pages/meetings/pages/participants/util/vote-delegation-rules';
 import { PERSONAL_FORM_CONTROLS, ViewUser } from 'src/app/site/pages/meetings/view-models/view-user';
 import { getCommitteeListMinimalSubscriptionConfig } from 'src/app/site/pages/organization/pages/committees/committees.subscription';
 import { CommitteeSortService } from 'src/app/site/pages/organization/pages/committees/pages/committee-list/services/committee-list-sort.service/committee-sort.service';
@@ -178,16 +183,14 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
         if (selectedIds.includes(user.id)) {
             return false;
         }
-        const maxAmountReached = selectedIds.length >= this._voteDelegationsMaxAmount;
         const ownMeetingUserId = this.user?.getMeetingUser(this.activeMeetingId)?.id;
-        const targetDelegatedToIds = user.vote_delegated_to_meeting_user_ids(this.activeMeetingId) ?? [];
-        const targetHasIncompatibleDelegation =
-            targetDelegatedToIds.length > 0 &&
-            (ownMeetingUserId === undefined || !targetDelegatedToIds.includes(ownMeetingUserId));
         return (
             user.id === this._userId ||
-            maxAmountReached ||
-            targetHasIncompatibleDelegation ||
+            selectedIds.length >= this._voteDelegationsMaxAmount ||
+            targetHasIncompatibleOutgoingDelegation(
+                user.vote_delegated_to_meeting_user_ids(this.activeMeetingId) ?? [],
+                ownMeetingUserId
+            ) ||
             ((this.personalInfoFormValue?.vote_delegations_from_ids as Id[]) ?? []).includes(user.id)
         );
     }
@@ -208,19 +211,17 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
         }
 
         const ownMeetingUserId = this.user?.getMeetingUser(this.activeMeetingId)?.id;
-        const targetDelegatedToIds = user.vote_delegated_to_meeting_user_ids(this.activeMeetingId) ?? [];
-        const targetAlreadyDelegatesToCurrent =
-            ownMeetingUserId !== undefined && targetDelegatedToIds.includes(ownMeetingUserId);
-        const targetWouldExceedMaxAmount =
-            !targetAlreadyDelegatesToCurrent && targetDelegatedToIds.length >= this._voteDelegationsMaxAmount;
-        const targetDelegationsFromIds = user.vote_delegations_from_meeting_user_ids(this.activeMeetingId) ?? [];
-        const targetReceivesIncompatibleDelegations =
-            targetDelegationsFromIds.length > 0 &&
-            (ownMeetingUserId === undefined ||
-                targetDelegationsFromIds.length !== 1 ||
-                targetDelegationsFromIds[0] !== ownMeetingUserId);
-
-        return targetWouldExceedMaxAmount || targetReceivesIncompatibleDelegations;
+        return (
+            targetWouldExceedMaxAmount(
+                user.vote_delegated_to_meeting_user_ids(this.activeMeetingId) ?? [],
+                ownMeetingUserId,
+                this._voteDelegationsMaxAmount
+            ) ||
+            targetReceivesIncompatibleDelegations(
+                user.vote_delegations_from_meeting_user_ids(this.activeMeetingId) ?? [],
+                ownMeetingUserId
+            )
+        );
     }
 
     public get saveButtonEnabled(): boolean {

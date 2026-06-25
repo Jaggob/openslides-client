@@ -13,6 +13,11 @@ import { OneOfValidator, UserDetailViewComponent } from 'src/app/site/modules/us
 import { BaseMeetingComponent } from 'src/app/site/pages/meetings/base/base-meeting.component';
 import { ViewGroup } from 'src/app/site/pages/meetings/pages/participants';
 import { ParticipantControllerService } from 'src/app/site/pages/meetings/pages/participants/services/common/participant-controller.service';
+import {
+    targetHasIncompatibleOutgoingDelegation,
+    targetReceivesIncompatibleDelegations,
+    targetWouldExceedMaxAmount
+} from 'src/app/site/pages/meetings/pages/participants/util/vote-delegation-rules';
 import { PERSONAL_FORM_CONTROLS, ViewUser } from 'src/app/site/pages/meetings/view-models/view-user';
 import { OrganizationSettingsService } from 'src/app/site/pages/organization/services/organization-settings.service';
 import { UserService } from 'src/app/site/services/user.service';
@@ -160,17 +165,15 @@ export class ParticipantCreateWizardComponent extends BaseMeetingComponent imple
         if (selectedIds.includes(user.id)) {
             return false;
         }
-        const maxAmountReached = selectedIds.length >= this._voteDelegationsMaxAmount;
         const ownMeetingUserId = this.getAccountMeetingUserId();
-        const targetDelegatedToIds = user.vote_delegated_to_meeting_user_ids(this.activeMeetingId) ?? [];
-        const targetHasIncompatibleDelegation =
-            targetDelegatedToIds.length > 0 &&
-            (ownMeetingUserId === undefined || !targetDelegatedToIds.includes(ownMeetingUserId));
         return (
             !this.canDelegateVote ||
             user.id === this._accountId ||
-            maxAmountReached ||
-            targetHasIncompatibleDelegation ||
+            selectedIds.length >= this._voteDelegationsMaxAmount ||
+            targetHasIncompatibleOutgoingDelegation(
+                user.vote_delegated_to_meeting_user_ids(this.activeMeetingId) ?? [],
+                ownMeetingUserId
+            ) ||
             ((this.personalInfoFormValue?.vote_delegations_from_ids as Id[]) ?? []).includes(user.id)
         );
     }
@@ -185,19 +188,17 @@ export class ParticipantCreateWizardComponent extends BaseMeetingComponent imple
         }
 
         const ownMeetingUserId = this.getAccountMeetingUserId();
-        const targetDelegatedToIds = user.vote_delegated_to_meeting_user_ids(this.activeMeetingId) ?? [];
-        const targetAlreadyDelegatesToCurrent =
-            ownMeetingUserId !== undefined && targetDelegatedToIds.includes(ownMeetingUserId);
-        const targetWouldExceedMaxAmount =
-            !targetAlreadyDelegatesToCurrent && targetDelegatedToIds.length >= this._voteDelegationsMaxAmount;
-        const targetDelegationsFromIds = user.vote_delegations_from_meeting_user_ids(this.activeMeetingId) ?? [];
-        const targetReceivesIncompatibleDelegations =
-            targetDelegationsFromIds.length > 0 &&
-            (ownMeetingUserId === undefined ||
-                targetDelegationsFromIds.length !== 1 ||
-                targetDelegationsFromIds[0] !== ownMeetingUserId);
-
-        return targetWouldExceedMaxAmount || targetReceivesIncompatibleDelegations;
+        return (
+            targetWouldExceedMaxAmount(
+                user.vote_delegated_to_meeting_user_ids(this.activeMeetingId) ?? [],
+                ownMeetingUserId,
+                this._voteDelegationsMaxAmount
+            ) ||
+            targetReceivesIncompatibleDelegations(
+                user.vote_delegations_from_meeting_user_ids(this.activeMeetingId) ?? [],
+                ownMeetingUserId
+            )
+        );
     }
 
     public sortFn = (groupA: ViewGroup, groupB: ViewGroup): number => groupA.weight - groupB.weight;

@@ -7,6 +7,11 @@ import { GENDERS } from 'src/app/domain/models/users/user';
 import { ViewGroup } from 'src/app/site/pages/meetings/pages/participants';
 import { GroupControllerService } from 'src/app/site/pages/meetings/pages/participants/modules';
 import { ParticipantControllerService } from 'src/app/site/pages/meetings/pages/participants/services/common/participant-controller.service';
+import {
+    targetHasIncompatibleOutgoingDelegation,
+    targetReceivesIncompatibleDelegations,
+    targetWouldExceedMaxAmount
+} from 'src/app/site/pages/meetings/pages/participants/util/vote-delegation-rules';
 import { MeetingSettingsService } from 'src/app/site/pages/meetings/services/meeting-settings.service';
 import { ViewMeetingUser } from 'src/app/site/pages/meetings/view-models/view-meeting-user';
 import { ViewUser } from 'src/app/site/pages/meetings/view-models/view-user';
@@ -123,19 +128,13 @@ export class ParticipantListInfoDialogComponent extends BaseUiComponent implemen
 
         const meetingUser = value as ViewMeetingUser;
         const ownMeetingUserId = this._currentUser?.getMeetingUser()?.id;
-        const targetDelegatedToIds = meetingUser.vote_delegated_to_ids ?? [];
-        const targetAlreadyDelegatesToCurrent =
-            ownMeetingUserId !== undefined && targetDelegatedToIds.includes(ownMeetingUserId);
-        const targetWouldExceedMaxAmount =
-            !targetAlreadyDelegatesToCurrent && targetDelegatedToIds.length >= this._voteDelegationsMaxAmount;
-        const targetDelegationsFromIds = meetingUser.vote_delegations_from_ids ?? [];
-        const targetReceivesIncompatibleDelegations =
-            targetDelegationsFromIds.length > 0 &&
-            (ownMeetingUserId === undefined ||
-                targetDelegationsFromIds.length !== 1 ||
-                targetDelegationsFromIds[0] !== ownMeetingUserId);
-
-        return targetWouldExceedMaxAmount || targetReceivesIncompatibleDelegations;
+        return (
+            targetWouldExceedMaxAmount(
+                meetingUser.vote_delegated_to_ids ?? [],
+                ownMeetingUserId,
+                this._voteDelegationsMaxAmount
+            ) || targetReceivesIncompatibleDelegations(meetingUser.vote_delegations_from_ids ?? [], ownMeetingUserId)
+        );
     }
 
     public isDelegationsToOptionDisabled(value: Selectable): boolean {
@@ -147,16 +146,11 @@ export class ParticipantListInfoDialogComponent extends BaseUiComponent implemen
         if (!this.canDelegateVote || value.id === this._currentUser?.getMeetingUser()?.id) {
             return true;
         }
-        const maxAmountReached = selectedIds.length >= this._voteDelegationsMaxAmount;
         const ownMeetingUserId = this._currentUser?.getMeetingUser()?.id;
-        const targetDelegatedToIds = meetingUser.vote_delegated_to_ids ?? [];
-        const targetHasIncompatibleDelegation =
-            targetDelegatedToIds.length > 0 &&
-            (ownMeetingUserId === undefined || !targetDelegatedToIds.includes(ownMeetingUserId));
         return (
-            maxAmountReached ||
+            selectedIds.length >= this._voteDelegationsMaxAmount ||
             (this.infoDialog.vote_delegations_from_ids ?? []).includes(value.id) ||
-            targetHasIncompatibleDelegation
+            targetHasIncompatibleOutgoingDelegation(meetingUser.vote_delegated_to_ids ?? [], ownMeetingUserId)
         );
     }
 }
