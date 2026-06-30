@@ -20,17 +20,11 @@ describe(`VotingService.votedBy`, () => {
     const MEETING_ID = 7;
     const REPRESENTED_MEETING_USER_ID = 110;
 
-    function createService(
-        ballots: any[],
-        actingUser: any = null
-    ): { service: VotingService; pollBallotsByUser: jasmine.Spy } {
+    function createService(ballots: any[]): { service: VotingService; pollBallotsByUser: jasmine.Spy } {
         const pollBallotsByUser = jasmine.createSpy(`pollBallotsByUser`).and.returnValue(of(ballots));
         const service = Object.create(VotingService.prototype) as VotingService;
         (service as any).activeMeetingService = { meetingId: MEETING_ID };
         (service as any).pollRepo = { pollBallotsByUser };
-        (service as any).meetingUserRepo = {
-            getViewModelObservable: () => of(actingUser ? { user: actingUser } : null)
-        };
         return { service, pollBallotsByUser };
     }
 
@@ -47,9 +41,9 @@ describe(`VotingService.votedBy`, () => {
         expect(pollBallotsByUser).toHaveBeenCalledWith(poll.id, REPRESENTED_MEETING_USER_ID);
     });
 
-    it(`returns the acting user when a ballot has been cast`, async () => {
+    it(`returns the acting user from the ballot's acting_meeting_user relation`, async () => {
         const actingUser = { id: 5, getShortName: () => `B` } as any;
-        const { service } = createService([{ acting_meeting_user_id: 50 }], actingUser);
+        const { service } = createService([{ acting_meeting_user: { user: actingUser } }]);
 
         expect(await firstValueFrom(service.votedBy(poll, user))).toBe(actingUser);
     });
@@ -61,19 +55,19 @@ describe(`VotingService.votedBy`, () => {
     });
 
     it(`returns null when the ballot has no acting meeting user`, async () => {
-        const { service } = createService([{ acting_meeting_user_id: undefined }]);
+        const { service } = createService([{ acting_meeting_user: undefined }]);
 
         expect(await firstValueFrom(service.votedBy(poll, user))).toBeNull();
     });
 
     it(`returns null when the acting meeting user has no resolved user`, async () => {
-        const { service } = createService([{ acting_meeting_user_id: 50 }], null);
+        const { service } = createService([{ acting_meeting_user: { user: undefined } }]);
 
         expect(await firstValueFrom(service.votedBy(poll, user))).toBeNull();
     });
 
     it(`returns null without a repository lookup when the user has no meeting_user`, async () => {
-        const { service, pollBallotsByUser } = createService([{ acting_meeting_user_id: 50 }]);
+        const { service, pollBallotsByUser } = createService([{ acting_meeting_user: { user: {} } }]);
         const userWithoutMeetingUser = { id: 10, getMeetingUser: () => undefined } as any;
 
         expect(await firstValueFrom(service.votedBy(poll, userWithoutMeetingUser))).toBeNull();

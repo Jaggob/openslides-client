@@ -1,8 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { _ } from '@ngx-translate/core';
-import { combineLatest, distinctUntilChanged, map, Observable, of, switchMap } from 'rxjs';
+import { combineLatest, distinctUntilChanged, map, Observable, of } from 'rxjs';
 import { PollState } from 'src/app/domain/models/poll/poll-constants';
-import { MeetingUserRepositoryService } from 'src/app/gateways/repositories/meeting_user/meeting-user-repository.service';
 import { PollRepositoryService } from 'src/app/gateways/repositories/polls/poll-repository.service';
 import { ViewPoll, ViewPollBallot } from 'src/app/site/pages/meetings/pages/polls';
 import { ViewUser } from 'src/app/site/pages/meetings/view-models/view-user';
@@ -45,7 +44,6 @@ export class VotingService {
 
     private userRepo = inject(UserControllerService);
     private pollRepo = inject(PollRepositoryService);
-    private meetingUserRepo = inject(MeetingUserRepositoryService);
 
     public constructor(
         private activeMeetingService: ActiveMeetingService,
@@ -95,17 +93,15 @@ export class VotingService {
         if (!representedMeetingUserId) {
             return of(null);
         }
-        return this.pollRepo.pollBallotsByUser(poll.id, representedMeetingUserId).pipe(
-            map(ballots => ballots[0]?.acting_meeting_user_id ?? null),
-            distinctUntilChanged(),
-            switchMap(actingMeetingUserId =>
-                actingMeetingUserId
-                    ? this.meetingUserRepo
-                          .getViewModelObservable(actingMeetingUserId)
-                          .pipe(map(meetingUser => meetingUser?.user ?? null))
-                    : of(null)
-            )
-        );
+        // The ballot's acting_meeting_user relation (and its user) is populated
+        // by the poll subscription, so resolve the acting user straight from the
+        // relation instead of a second meeting_user repository lookup.
+        return this.pollRepo
+            .pollBallotsByUser(poll.id, representedMeetingUserId)
+            .pipe(
+                map(ballots => ballots[0]?.acting_meeting_user?.user ?? null),
+                distinctUntilChanged()
+            );
     }
 
     /**
