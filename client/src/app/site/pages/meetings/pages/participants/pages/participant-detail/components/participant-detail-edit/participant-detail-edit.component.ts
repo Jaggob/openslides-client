@@ -14,6 +14,11 @@ import {
     MEETING_RELATED_FORM_CONTROLS,
     ParticipantControllerService
 } from 'src/app/site/pages/meetings/pages/participants/services/common/participant-controller.service';
+import {
+    targetHasIncompatibleOutgoingDelegation,
+    targetReceivesIncompatibleDelegations,
+    targetWouldExceedMaxAmount
+} from 'src/app/site/pages/meetings/pages/participants/util/vote-delegation-rules';
 import { PERSONAL_FORM_CONTROLS, ViewUser } from 'src/app/site/pages/meetings/view-models/view-user';
 import { getCommitteeListMinimalSubscriptionConfig } from 'src/app/site/pages/organization/pages/committees/committees.subscription';
 import { CommitteeSortService } from 'src/app/site/pages/organization/pages/committees/pages/committee-list/services/committee-list-sort.service/committee-sort.service';
@@ -53,8 +58,8 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
         about_me: [``],
         comment: [``],
         group_ids: [``],
-        vote_delegations_from_ids: [``],
-        vote_delegated_to_id: [``],
+        vote_delegations_from_ids: [[]],
+        vote_delegated_to_ids: [[]],
         is_present: [``],
         locked_out: [``],
         external: [``],
@@ -155,6 +160,70 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
         return this._isVoteDelegationEnabled;
     }
 
+    public get canDelegateVote(): boolean {
+        const delegationFromIds =
+            (this.personalInfoFormValue?.vote_delegations_from_ids as Id[]) ??
+            this.user?.vote_delegations_from_ids(this.activeMeetingId) ??
+            [];
+        return delegationFromIds.length === 0;
+    }
+
+    public get canReceiveDelegations(): boolean {
+        return ((this.personalInfoFormValue?.vote_delegated_to_ids as Id[]) ?? []).length === 0;
+    }
+
+    public readonly isDelegationsToOptionDisabledFn = (user: ViewUser): boolean =>
+        this.isDelegationsToOptionDisabled(user);
+
+    public readonly isDelegationsFromOptionDisabledFn = (user: ViewUser): boolean =>
+        this.isDelegationsFromOptionDisabled(user);
+
+    public isDelegationsToOptionDisabled(user: ViewUser): boolean {
+        const selectedIds = ((this.personalInfoFormValue?.vote_delegated_to_ids as Id[]) ?? []).filter(id => !!id);
+        if (selectedIds.includes(user.id)) {
+            return false;
+        }
+        const ownMeetingUserId = this.user?.getMeetingUser(this.activeMeetingId)?.id;
+        return (
+            user.id === this._userId ||
+            selectedIds.length >= this._voteDelegationsMaxAmount ||
+            targetHasIncompatibleOutgoingDelegation(
+                user.vote_delegated_to_meeting_user_ids(this.activeMeetingId) ?? [],
+                ownMeetingUserId
+            ) ||
+            ((this.personalInfoFormValue?.vote_delegations_from_ids as Id[]) ?? []).includes(user.id)
+        );
+    }
+
+    public isDelegationsFromOptionDisabled(user: ViewUser): boolean {
+        const selectedIds = ((this.personalInfoFormValue?.vote_delegations_from_ids as Id[]) ?? []).filter(id => !!id);
+        if (selectedIds.includes(user.id)) {
+            return false;
+        }
+        const existingDelegatorIds = (this.user?.vote_delegations_from_ids(this.activeMeetingId) ?? []) as Id[];
+        if (!this.canReceiveDelegations || user.id === this._userId) {
+            return true;
+        }
+
+        const canAddReverseDelegations = this.isAllowed(`update`);
+        if (!canAddReverseDelegations) {
+            return !existingDelegatorIds.includes(user.id);
+        }
+
+        const ownMeetingUserId = this.user?.getMeetingUser(this.activeMeetingId)?.id;
+        return (
+            targetWouldExceedMaxAmount(
+                user.vote_delegated_to_meeting_user_ids(this.activeMeetingId) ?? [],
+                ownMeetingUserId,
+                this._voteDelegationsMaxAmount
+            ) ||
+            targetReceivesIncompatibleDelegations(
+                user.vote_delegations_from_meeting_user_ids(this.activeMeetingId) ?? [],
+                ownMeetingUserId
+            )
+        );
+    }
+
     public get saveButtonEnabled(): boolean {
         return this._userFormLoaded && this.isFormValid && !this.isLockedOutAndCanManage;
     }
@@ -181,6 +250,7 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
     private _userFormLoaded = false;
     private _isVoteWeightEnabled = false;
     private _isVoteDelegationEnabled = false;
+    private _voteDelegationsMaxAmount = 1;
     private _isElectronicVotingEnabled = false;
     private _isDefaultPasswordEditable = false;
     private _isUserEditable = false;
@@ -214,7 +284,11 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
 
             this.meetingSettingsService
                 .get(`users_enable_vote_delegations`)
-                .subscribe(enabled => (this._isVoteDelegationEnabled = enabled))
+                .subscribe(enabled => (this._isVoteDelegationEnabled = enabled)),
+
+            this.meetingSettingsService
+                .get(`users_vote_delegations_max_amount`)
+                .subscribe(maxAmount => (this._voteDelegationsMaxAmount = maxAmount ?? 1))
         );
 
         this.structureLevelObservable = this.structureLevelRepo.getViewModelListObservable();
@@ -312,18 +386,15 @@ export class ParticipantDetailEditComponent extends BaseMeetingComponent impleme
         if (this.operator.hasPerms(Permission.userCanUpdate)) {
             this.checkForGroups(this.personalInfoFormValue);
             const isPresent = this.personalInfoFormValue.is_present || false;
-            if (this.personalInfoFormValue.vote_delegated_to_id === 0) {
-                this.personalInfoFormValue.vote_delegated_to_id = null;
-            }
             const payload = {
                 ...this.personalInfoFormValue,
-                vote_delegated_to_id: this.personalInfoFormValue.vote_delegated_to_id
-                    ? this.repo.getViewModel(this.personalInfoFormValue.vote_delegated_to_id).getMeetingUser().id
-                    : null,
+                vote_delegated_to_ids: (this.personalInfoFormValue.vote_delegated_to_ids || [])
+                    .filter(id => !!id)
+                    .map(id => this.repo.getViewModel(id).getMeetingUser().id),
                 vote_delegations_from_ids: this.personalInfoFormValue.vote_delegations_from_ids
                     ? this.personalInfoFormValue.vote_delegations_from_ids
-                          .map(id => this.repo.getViewModel(id).getMeetingUser().id)
                           .filter(id => !!id)
+                          .map(id => this.repo.getViewModel(id).getMeetingUser().id)
                     : []
             };
             if (payload.member_number === ``) {

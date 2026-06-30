@@ -43,9 +43,10 @@ interface IMeetingUserRelations {
     motion_editors: ViewMotionEditor[];
     motion_working_group_speakers: ViewMotionWorkingGroupSpeaker[];
     poll_voted: ViewPoll;
-    vote_delegated_to: ViewMeetingUser;
+    vote_delegated_to: ViewMeetingUser[];
     vote_delegations_from: ViewMeetingUser[];
     vote_delegated_votes: ViewPollBallot[];
+    acting_ballots: ViewPollBallot[];
     structure_levels: ViewStructureLevel[];
     poll_options: ViewPollOption[];
 }

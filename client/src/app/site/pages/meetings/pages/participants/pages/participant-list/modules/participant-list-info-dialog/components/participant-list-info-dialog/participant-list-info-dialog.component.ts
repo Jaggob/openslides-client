@@ -7,6 +7,11 @@ import { GENDERS } from 'src/app/domain/models/users/user';
 import { ViewGroup } from 'src/app/site/pages/meetings/pages/participants';
 import { GroupControllerService } from 'src/app/site/pages/meetings/pages/participants/modules';
 import { ParticipantControllerService } from 'src/app/site/pages/meetings/pages/participants/services/common/participant-controller.service';
+import {
+    targetHasIncompatibleOutgoingDelegation,
+    targetReceivesIncompatibleDelegations,
+    targetWouldExceedMaxAmount
+} from 'src/app/site/pages/meetings/pages/participants/util/vote-delegation-rules';
 import { MeetingSettingsService } from 'src/app/site/pages/meetings/services/meeting-settings.service';
 import { ViewMeetingUser } from 'src/app/site/pages/meetings/view-models/view-meeting-user';
 import { ViewUser } from 'src/app/site/pages/meetings/view-models/view-user';
@@ -39,6 +44,14 @@ export class ParticipantListInfoDialogComponent extends BaseUiComponent implemen
         return this._voteDelegationEnabled;
     }
 
+    public get canDelegateVote(): boolean {
+        return (this.infoDialog.vote_delegations_from_ids ?? []).length === 0;
+    }
+
+    public get canReceiveDelegations(): boolean {
+        return (this.infoDialog.vote_delegated_to_ids ?? []).length === 0;
+    }
+
     public get canOnlyEditOwnDelegation(): boolean {
         return (
             this.operator.hasPerms(Permission.userCanEditOwnDelegation) &&
@@ -52,6 +65,7 @@ export class ParticipantListInfoDialogComponent extends BaseUiComponent implemen
     private readonly _otherParticipantsSubject = new BehaviorSubject<ViewMeetingUser[]>([]);
     private _currentUser: ViewUser | null = null;
     private _voteDelegationEnabled = false;
+    private _voteDelegationsMaxAmount = 1;
 
     public constructor(
         @Inject(MAT_DIALOG_DATA) public readonly infoDialog: InfoDialog,
@@ -81,7 +95,10 @@ export class ParticipantListInfoDialogComponent extends BaseUiComponent implemen
                 ),
             this.meetingSettings
                 .get(`users_enable_vote_delegations`)
-                .subscribe(enabled => (this._voteDelegationEnabled = enabled))
+                .subscribe(enabled => (this._voteDelegationEnabled = enabled)),
+            this.meetingSettings
+                .get(`users_vote_delegations_max_amount`)
+                .subscribe(maxAmount => (this._voteDelegationsMaxAmount = maxAmount ?? 1))
         );
     }
 
@@ -90,13 +107,50 @@ export class ParticipantListInfoDialogComponent extends BaseUiComponent implemen
         super.ngOnDestroy();
     }
 
-    public getDisableOptionFn(vote_delegations: number[]): (value: Selectable) => boolean {
-        if (this.canOnlyEditOwnDelegation) {
-            return value => {
-                return vote_delegations ? !vote_delegations.some(x => x === value.id) : true;
-            };
-        } else {
-            return _ => false;
+    public readonly isDelegationsFromOptionDisabledFn = (value: Selectable): boolean =>
+        this.isDelegationsFromOptionDisabled(value);
+
+    public readonly isDelegationsToOptionDisabledFn = (value: Selectable): boolean =>
+        this.isDelegationsToOptionDisabled(value);
+
+    public isDelegationsFromOptionDisabled(value: Selectable): boolean {
+        const selectedIds = (this.infoDialog.vote_delegations_from_ids ?? []).filter(id => !!id);
+        if (selectedIds.includes(value.id)) {
+            return false;
         }
+        if (
+            this.canOnlyEditOwnDelegation ||
+            !this.canReceiveDelegations ||
+            value.id === this._currentUser?.getMeetingUser()?.id
+        ) {
+            return true;
+        }
+
+        const meetingUser = value as ViewMeetingUser;
+        const ownMeetingUserId = this._currentUser?.getMeetingUser()?.id;
+        return (
+            targetWouldExceedMaxAmount(
+                meetingUser.vote_delegated_to_ids ?? [],
+                ownMeetingUserId,
+                this._voteDelegationsMaxAmount
+            ) || targetReceivesIncompatibleDelegations(meetingUser.vote_delegations_from_ids ?? [], ownMeetingUserId)
+        );
+    }
+
+    public isDelegationsToOptionDisabled(value: Selectable): boolean {
+        const meetingUser = value as ViewMeetingUser;
+        const selectedIds = (this.infoDialog.vote_delegated_to_ids ?? []).filter(id => !!id);
+        if (selectedIds.includes(value.id)) {
+            return false;
+        }
+        if (!this.canDelegateVote || value.id === this._currentUser?.getMeetingUser()?.id) {
+            return true;
+        }
+        const ownMeetingUserId = this._currentUser?.getMeetingUser()?.id;
+        return (
+            selectedIds.length >= this._voteDelegationsMaxAmount ||
+            (this.infoDialog.vote_delegations_from_ids ?? []).includes(value.id) ||
+            targetHasIncompatibleOutgoingDelegation(meetingUser.vote_delegated_to_ids ?? [], ownMeetingUserId)
+        );
     }
 }

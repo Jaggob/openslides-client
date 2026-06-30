@@ -1,6 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import { _ } from '@ngx-translate/core';
-import { combineLatest, map, Observable } from 'rxjs';
+import { combineLatest, distinctUntilChanged, map, Observable, of } from 'rxjs';
 import { PollState } from 'src/app/domain/models/poll/poll-constants';
 import { PollRepositoryService } from 'src/app/gateways/repositories/polls/poll-repository.service';
 import { ViewPoll, ViewPollBallot } from 'src/app/site/pages/meetings/pages/polls';
@@ -60,20 +60,62 @@ export class VotingService {
     }
 
     /**
+     * poll_ballot is keyed by the represented meeting_user, not the user, so the
+     * "already voted" / "voted by" lookups must resolve the represented user's
+     * meeting_user id in the active meeting (the two only coincide in freshly
+     * seeded data).
+     */
+    private representedMeetingUserId(user?: ViewUser): number | undefined {
+        return user?.getMeetingUser(this.activeMeetingService.meetingId)?.id;
+    }
+
+    /**
      * checks whether the operator can vote on the given poll
      */
     public hasVoted(poll: ViewPoll, user?: ViewUser): Observable<boolean> {
-        return this.pollRepo.pollBallotsByUser(poll.id, user.id).pipe(map(ballots => !!ballots.length));
+        const representedMeetingUserId = this.representedMeetingUserId(user);
+        if (!representedMeetingUserId) {
+            return of(false);
+        }
+        return this.pollRepo
+            .pollBallotsByUser(poll.id, representedMeetingUserId)
+            .pipe(map(ballots => !!ballots.length));
+    }
+
+    /**
+     * Resolves who actually cast the (already submitted) ballot for the given
+     * represented user. This is visible to the represented user and to all of
+     * their delegates (restriction mode C of poll_ballot), so the other proxies
+     * can see which one of them already voted. Returns null if nobody voted yet.
+     */
+    public votedBy(poll: ViewPoll, user?: ViewUser): Observable<ViewUser | null> {
+        const representedMeetingUserId = this.representedMeetingUserId(user);
+        if (!representedMeetingUserId) {
+            return of(null);
+        }
+        // The ballot's acting_meeting_user relation (and its user) is populated
+        // by the poll subscription, so resolve the acting user straight from the
+        // relation instead of a second meeting_user repository lookup.
+        return this.pollRepo
+            .pollBallotsByUser(poll.id, representedMeetingUserId)
+            .pipe(
+                map(ballots => ballots[0]?.acting_meeting_user?.user ?? null),
+                distinctUntilChanged()
+            );
     }
 
     /**
      * checks whether the operator can vote on the given poll
      */
     public votingProhibited(poll: ViewPoll, user?: ViewUser): Observable<VotingProhibition | null> {
+        if (!user) {
+            return of(null);
+        }
+        const representedMeetingUserId = this.representedMeetingUserId(user);
         return combineLatest([
             this.userRepo.getViewModelObservable(user.id),
             this.pollRepo.getViewModelObservable(poll.id),
-            this.pollRepo.pollBallotsByUser(poll.id, user.id)
+            representedMeetingUserId ? this.pollRepo.pollBallotsByUser(poll.id, representedMeetingUserId) : of([])
         ]).pipe(
             map(([user, poll, ballots]) => {
                 return this.getVotingProhibitionReason(poll, user, ballots);

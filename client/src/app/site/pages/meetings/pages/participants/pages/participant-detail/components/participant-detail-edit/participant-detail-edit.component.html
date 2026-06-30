@@ -121,6 +121,8 @@
                                 <mat-label>{{ 'Voting right received from (principals)' | translate }}</mat-label>
                                 <os-repo-search-selector
                                     formControlName="vote_delegations_from_ids"
+                                    [disableOptionWhenFn]="isDelegationsFromOptionDisabledFn"
+                                    [disabled]="!canReceiveDelegations"
                                     [multiple]="true"
                                     [repo]="repo"
                                     [sortService]="sortService"
@@ -133,9 +135,11 @@
                             <mat-form-field class="form100 force-min-with">
                                 <mat-label>{{ 'Voting right delegated to (proxy)' | translate }}</mat-label>
                                 <os-repo-search-selector
-                                    formControlName="vote_delegated_to_id"
-                                    [includeNone]="true"
-                                    [multiple]="false"
+                                    formControlName="vote_delegated_to_ids"
+                                    [disableOptionWhenFn]="isDelegationsToOptionDisabledFn"
+                                    [disabled]="!canDelegateVote"
+                                    [includeNone]="false"
+                                    [multiple]="true"
                                     [repo]="repo"
                                     [sortService]="sortService"
                                     [subscriptionConfig]="participantSubscriptionConfig"

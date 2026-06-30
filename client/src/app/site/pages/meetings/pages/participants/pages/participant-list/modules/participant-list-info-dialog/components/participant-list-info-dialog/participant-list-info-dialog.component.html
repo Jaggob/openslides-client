@@ -16,7 +16,8 @@
         <mat-form-field>
             <mat-label>{{ 'Voting right received from (principals)' | translate }}</mat-label>
             <os-list-search-selector
-                [disableOptionWhenFn]="getDisableOptionFn(infoDialog.vote_delegations_from_ids)"
+                [disableOptionWhenFn]="isDelegationsFromOptionDisabledFn"
+                [disabled]="!canReceiveDelegations"
                 [inputListValues]="otherParticipantsObservable"
                 [multiple]="true"
                 [sortFn]="false"
@@ -27,11 +28,13 @@
         <mat-form-field>
             <mat-label>{{ 'Voting right delegated to (proxy)' | translate }}</mat-label>
             <os-list-search-selector
-                [includeNone]="true"
+                [disableOptionWhenFn]="isDelegationsToOptionDisabledFn"
+                [disabled]="!canDelegateVote"
+                [includeNone]="false"
                 [inputListValues]="otherParticipantsObservable"
-                [multiple]="false"
+                [multiple]="true"
                 [sortFn]="false"
-                [(ngModel)]="infoDialog.vote_delegated_to_id"
+                [(ngModel)]="infoDialog.vote_delegated_to_ids"
             />
         </mat-form-field>
     }
@@ -58,7 +61,7 @@
         [mat-dialog-close]="{
             group_ids: infoDialog.group_ids,
             vote_delegations_from_ids: infoDialog.vote_delegations_from_ids,
-            vote_delegated_to_id: infoDialog.vote_delegated_to_id,
+            vote_delegated_to_ids: infoDialog.vote_delegated_to_ids,
             number: infoDialog.number,
             structure_level_ids: infoDialog.structure_level_ids
         }"
